@@ -2,6 +2,8 @@
 
 Selected procedural engines by Mateo at SyberLabs, with a self-portrait by Claude.
 
+Live at: https://sykosyber.github.io/engines/
+
 Each engine is a single self-contained HTML file in `works/`, using Canvas 2D or WebGL2 and no libraries. `index.html` is the portfolio page; every work can be run live from it, or opened directly.
 
 | Work | File | Renderer |
