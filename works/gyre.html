@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GYRE — a pattern engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#08070a;
+    --ground-2:#14121a;
+    --line:#262232;
+    --ink:#ece8f0;
+    --ink-dim:#8b8598;
+    --astra:#e6b85c;
+    --astra-dim:#7a6636;
+    --cool:#8fb8ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ground);color:var(--ink);}
+  body{font-family:"Cormorant Garamond",Georgia,serif;min-height:100vh;-webkit-font-smoothing:antialiased;position:relative;overflow-x:hidden;}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 22px 60px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:26px;}
+  .brand{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.42em;color:var(--astra);text-transform:uppercase;}
+  h1{font-family:"Cormorant Garamond",serif;font-weight:500;font-size:clamp(30px,6vw,54px);letter-spacing:.06em;margin:.12em 0 0;line-height:1;}
+  .tag{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--ink-dim);max-width:38ch;text-align:right;}
+  .stage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:34px;align-items:start;}
+  @media (max-width:880px){ .stage{grid-template-columns:1fr;} }
+  .plate-frame{position:relative;background:#040406;border:1px solid var(--line);box-shadow:0 1px 0 rgba(255,255,255,.03), 0 40px 90px -40px rgba(0,0,0,.9);padding:14px;}
+  .plate-inner{position:relative;border:1px solid rgba(200,180,140,.08);}
+  canvas{display:block;width:100%;height:auto;image-rendering:auto;background:#000;}
+  .plate-label{position:absolute;left:12px;bottom:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-end;font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.08em;color:rgba(230,215,180,.6);pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.9);}
+  .plate-label .r{text-align:right;line-height:1.5;}
+  .progress{position:absolute;left:14px;right:14px;top:14px;height:2px;background:rgba(230,200,120,.12);overflow:hidden;opacity:0;transition:opacity .2s;}
+  .progress.on{opacity:1;}
+  .progress i{display:block;height:100%;width:0;background:var(--astra);transition:width .06s linear;}
+  .rail{display:flex;flex-direction:column;gap:20px;}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  button{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;background:var(--ground-2);color:var(--ink);border:1px solid var(--line);padding:12px 10px;cursor:pointer;transition:border-color .15s, color .15s, background .15s;}
+  button:hover{border-color:var(--astra);color:#fff;}
+  button:focus-visible{outline:2px solid var(--astra);outline-offset:2px;}
+  button.primary{background:linear-gradient(180deg,#f0cd78,#d3a544);color:#1a1206;border-color:var(--astra);font-weight:700;}
+  button.primary:hover{background:linear-gradient(180deg,#f6da92,#dcb256);}
+  button.wide{grid-column:1 / -1;}
+  button:disabled{opacity:.4;cursor:progress;}
+  fieldset{border:1px solid var(--line);padding:14px 14px 16px;margin:0;}
+  legend{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--astra);padding:0 8px;}
+  .ctl{margin-top:12px;}
+  .ctl:first-of-type{margin-top:4px;}
+  .ctl label{display:flex;justify-content:space-between;align-items:baseline;font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.06em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:6px;}
+  .ctl label .val{color:var(--ink);}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:var(--line);outline:none;margin:6px 0;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--astra);cursor:pointer;border:2px solid var(--ground);}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--astra);cursor:pointer;border:2px solid var(--ground);}
+  input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--astra);outline-offset:2px;}
+  select, input[type=text]{width:100%;font-family:"Space Mono",monospace;font-size:11px;background:var(--ground-2);color:var(--ink);border:1px solid var(--line);padding:8px;letter-spacing:.05em;}
+  select:focus-visible, input[type=text]:focus-visible{outline:2px solid var(--astra);outline-offset:1px;}
+  .toggle{display:flex;align-items:center;gap:8px;font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.06em;color:var(--ink-dim);text-transform:uppercase;cursor:pointer;user-select:none;margin-top:12px;}
+  .toggle input{accent-color:var(--astra);width:15px;height:15px;}
+  .seedrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;}
+  .hint{font-family:"Space Mono",monospace;font-size:9.5px;letter-spacing:.04em;color:var(--ink-dim);line-height:1.6;margin-top:10px;}
+  em{color:var(--astra-dim);font-style:italic;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">SyberLabs · Pattern Engine</div>
+      <h1>Gyre</h1>
+    </div>
+    <div class="tag">A single luminous thread — one orbit of a strange attractor, tumbling in the void. Each seed appears once.</div>
+  </header>
+
+  <div class="stage">
+    <div class="plate-frame">
+      <div class="plate-inner">
+        <canvas id="cv" width="1000" height="1000" aria-label="generated attractor filament"></canvas>
+        <div class="progress" id="prog"><i></i></div>
+        <div class="plate-label">
+          <div id="lblLeft">GYRE</div>
+          <div class="r" id="lblRight"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="actions">
+        <button class="primary wide" id="btnNew">New orbit</button>
+        <button id="btnRender">Re-develop</button>
+        <button id="btnExport">Export PNG</button>
+      </div>
+
+      <fieldset>
+        <legend>Seed</legend>
+        <div class="ctl seedrow">
+          <input type="text" id="seed" spellcheck="false" aria-label="seed">
+          <button id="btnCopy" style="padding:8px 10px;">Copy</button>
+        </div>
+        <div class="hint">Same seed and settings always yield the same orbit. Change the seed for a new one.</div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Form</legend>
+        <div class="ctl">
+          <label for="family">Attractor</label>
+          <select id="family">
+            <option value="auto">Auto (seed decides)</option>
+            <option value="lorenz">Lorenz</option>
+            <option value="thomas">Thomas</option>
+            <option value="aizawa">Aizawa</option>
+            <option value="halvorsen">Halvorsen</option>
+            <option value="dadras">Dadras</option>
+            <option value="four_wing">Four-wing</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label for="trace">Orbit length <span class="val" id="vTrace"></span></label>
+          <input type="range" id="trace" min="0.3" max="1.6" step="0.02" value="1.0">
+        </div>
+        <div class="ctl">
+          <label for="scale">Scale <span class="val" id="vScale"></span></label>
+          <input type="range" id="scale" min="0.55" max="1.25" step="0.01" value="0.92">
+        </div>
+        <div class="ctl">
+          <label for="weight">Line weight <span class="val" id="vWeight"></span></label>
+          <input type="range" id="weight" min="0.4" max="2.2" step="0.05" value="1.0">
+        </div>
+        <div class="ctl">
+          <label for="quality">Density</label>
+          <select id="quality">
+            <option value="1">Draft — fast</option>
+            <option value="2" selected>Standard</option>
+            <option value="3">Fine</option>
+            <option value="4">Exhibition — slow</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>View</legend>
+        <div class="ctl">
+          <label for="yaw">Yaw <span class="val" id="vYaw"></span></label>
+          <input type="range" id="yaw" min="0" max="6.28" step="0.01" value="0">
+        </div>
+        <div class="ctl">
+          <label for="pitch">Pitch <span class="val" id="vPitch"></span></label>
+          <input type="range" id="pitch" min="0" max="6.28" step="0.01" value="0">
+        </div>
+        <div class="ctl">
+          <label for="roll">Roll <span class="val" id="vRoll"></span></label>
+          <input type="range" id="roll" min="0" max="6.28" step="0.01" value="0">
+        </div>
+        <div class="ctl">
+          <label for="depth">Depth cue <span class="val" id="vDepth"></span></label>
+          <input type="range" id="depth" min="0" max="1" step="0.02" value="0.7">
+        </div>
+        <div class="ctl">
+          <label for="persp">Perspective <span class="val" id="vPersp"></span></label>
+          <input type="range" id="persp" min="0" max="1" step="0.02" value="0.5">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Light</legend>
+        <div class="ctl">
+          <label for="exposure">Exposure <span class="val" id="vExp"></span></label>
+          <input type="range" id="exposure" min="0.3" max="4" step="0.05" value="1.3">
+        </div>
+        <div class="ctl">
+          <label for="gamma">Gamma <span class="val" id="vGamma"></span></label>
+          <input type="range" id="gamma" min="0.5" max="1.6" step="0.02" value="0.82">
+        </div>
+        <div class="ctl">
+          <label for="bloom">Bloom <span class="val" id="vBloom"></span></label>
+          <input type="range" id="bloom" min="0" max="1.6" step="0.02" value="0.7">
+        </div>
+        <div class="ctl">
+          <label for="haze">Haze <span class="val" id="vHaze"></span></label>
+          <input type="range" id="haze" min="0" max="1.2" step="0.02" value="0.4">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Color &amp; Optics</legend>
+        <div class="ctl">
+          <label for="palette">Spectrum</label>
+          <select id="palette">
+            <option value="aurora">Aurora (green-gold)</option>
+            <option value="plasma">Plasma (magenta-gold)</option>
+            <option value="spectral">Spectral (full)</option>
+            <option value="astra">Astra (gold-white)</option>
+            <option value="ice">Ice (blue-white)</option>
+            <option value="ember">Ember (red-gold)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label for="cmode">Colour by</label>
+          <select id="cmode">
+            <option value="depth">Depth (near / far)</option>
+            <option value="length">Arc length</option>
+            <option value="speed">Speed</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label for="hue">Phase <span class="val" id="vHue"></span></label>
+          <input type="range" id="hue" min="0" max="1" step="0.005" value="0">
+        </div>
+        <div class="ctl">
+          <label for="sat">Saturation <span class="val" id="vSat"></span></label>
+          <input type="range" id="sat" min="0" max="1" step="0.02" value="0.9">
+        </div>
+        <div class="ctl">
+          <label for="chroma">Dispersion <span class="val" id="vChr"></span></label>
+          <input type="range" id="chroma" min="0" max="12" step="0.1" value="5">
+        </div>
+        <div class="ctl">
+          <label for="grain">Grain <span class="val" id="vGrain"></span></label>
+          <input type="range" id="grain" min="0" max="0.16" step="0.005" value="0.05">
+        </div>
+        <label class="toggle"><input type="checkbox" id="imprint"> Imprint seed on export</label>
+      </fieldset>
+
+      <div class="hint">Third in the series with <em>Ostensoria</em> and <em>Apparitio</em>. Where those raise forms on a plane, this one casts a single body of light into depth.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clamp=(x,a,b)=>x<a?a:x>b?b:x;
+  const smooth=(a,b,x)=>{let t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+  const fract=x=>x-Math.floor(x);
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const TAU=Math.PI*2;
+
+  function xmur3(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19;}return function(){h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);h^=h>>>16;return h>>>0;};}
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+  // depth-indexed spectral LUTs
+  const RAMPS={
+    aurora:[[0,[0.02,0.05,0.12]],[0.25,[0.10,0.35,0.55]],[0.5,[0.15,0.85,0.65]],[0.72,[0.55,1.0,0.55]],[0.88,[0.95,0.95,0.6]],[1,[1,1,0.95]]],
+    plasma:[[0,[0.05,0.02,0.15]],[0.25,[0.35,0.05,0.55]],[0.5,[0.85,0.15,0.45]],[0.72,[1.0,0.45,0.2]],[0.88,[1.0,0.85,0.35]],[1,[1,1,0.9]]],
+    spectral:[[0,[0.25,0.05,0.5]],[0.2,[0.15,0.2,0.95]],[0.4,[0.1,0.75,0.85]],[0.6,[0.35,0.9,0.3]],[0.78,[1.0,0.8,0.15]],[0.92,[1.0,0.3,0.25]],[1,[1,0.85,0.85]]],
+    astra:[[0,[0.06,0.04,0.02]],[0.28,[0.35,0.20,0.05]],[0.52,[0.75,0.5,0.15]],[0.72,[1.0,0.78,0.3]],[0.88,[1.0,0.93,0.6]],[1,[1,1,0.95]]],
+    ice:[[0,[0.03,0.05,0.12]],[0.3,[0.10,0.30,0.65]],[0.55,[0.25,0.6,1.0]],[0.75,[0.6,0.85,1.0]],[0.9,[0.9,0.97,1.0]],[1,[1,1,1]]],
+    ember:[[0,[0.10,0.02,0.02]],[0.3,[0.5,0.06,0.05]],[0.54,[0.95,0.25,0.06]],[0.74,[1.0,0.55,0.15]],[0.9,[1.0,0.85,0.4]],[1,[1,0.98,0.85]]]
+  };
+  function buildLUT(anchors, sat, rot){
+    rot=rot||0; const L=new Float32Array(256*3);
+    for(let i=0;i<256;i++){
+      const u=fract(i/255 + rot); let j=0;
+      while(j<anchors.length-1 && u>anchors[j+1][0]) j++;
+      const a=anchors[j], b=anchors[Math.min(j+1,anchors.length-1)];
+      const span=(b[0]-a[0])||1, f=clamp((u-a[0])/span,0,1);
+      let r=a[1][0]+(b[1][0]-a[1][0])*f, g=a[1][1]+(b[1][1]-a[1][1])*f, bl=a[1][2]+(b[1][2]-a[1][2])*f;
+      const lum=0.299*r+0.587*g+0.114*bl;
+      L[i*3]=lum+(r-lum)*sat; L[i*3+1]=lum+(g-lum)*sat; L[i*3+2]=lum+(bl-lum)*sat;
+    }
+    return L;
+  }
+  function lutRGB(LUT,u,out){ const idx=(clamp(u,0,0.9999)*255)|0, o=idx*3; out[0]=LUT[o];out[1]=LUT[o+1];out[2]=LUT[o+2]; }
+
+  // ---- 3D attractors (RK4-integrated) ----
+  function makeAttractor(kind){
+    switch(kind){
+      case "lorenz":   {const s=10,r=28,b=8/3; return{dt:0.006,warm:2000,step:(p,o)=>{o[0]=s*(p[1]-p[0]);o[1]=p[0]*(r-p[2])-p[1];o[2]=p[0]*p[1]-b*p[2];},start:[0.1,0,0]};}
+      case "thomas":   {const b=0.208; return{dt:0.02,warm:3000,step:(p,o)=>{o[0]=Math.sin(p[1])-b*p[0];o[1]=Math.sin(p[2])-b*p[1];o[2]=Math.sin(p[0])-b*p[2];},start:[1.1,1.1,-0.5]};}
+      case "aizawa":   {const a=0.95,b=0.7,c=0.6,d=3.5,e=0.25,f=0.1; return{dt:0.01,warm:3000,step:(p,o)=>{o[0]=(p[2]-b)*p[0]-d*p[1];o[1]=d*p[0]+(p[2]-b)*p[1];o[2]=c+a*p[2]-p[2]*p[2]*p[2]/3-(p[0]*p[0]+p[1]*p[1])*(1+e*p[2])+f*p[2]*p[0]*p[0]*p[0];},start:[0.1,0,0]};}
+      case "halvorsen":{const a=1.89; return{dt:0.008,warm:2000,step:(p,o)=>{o[0]=-a*p[0]-4*p[1]-4*p[2]-p[1]*p[1];o[1]=-a*p[1]-4*p[2]-4*p[0]-p[2]*p[2];o[2]=-a*p[2]-4*p[0]-4*p[1]-p[0]*p[0];},start:[-1.48,-1.51,2.04]};}
+      case "four_wing":{const a=0.2,b=0.01,c=-0.4; return{dt:0.02,warm:3000,step:(p,o)=>{o[0]=a*p[0]+p[1]*p[2];o[1]=b*p[0]+c*p[1]-p[0]*p[2];o[2]=-p[2]-p[0]*p[1];},start:[1.0,0.1,0.1]};}
+      default:         {const a=3,b=2.7,c=1.7,d=2,e=9; return{dt:0.006,warm:2000,step:(p,o)=>{o[0]=p[1]-a*p[0]+b*p[1]*p[2];o[1]=c*p[1]-p[0]*p[2]+p[2];o[2]=d*p[0]*p[1]-e*p[2];},start:[1.1,2.1,-2]};}
+    }
+  }
+  function rk4(att,p){const dt=att.dt,k1=A,k2=B,k3=C,k4=D,tmp=E;
+    att.step(p,k1);for(let i=0;i<3;i++)tmp[i]=p[i]+0.5*dt*k1[i];
+    att.step(tmp,k2);for(let i=0;i<3;i++)tmp[i]=p[i]+0.5*dt*k2[i];
+    att.step(tmp,k3);for(let i=0;i<3;i++)tmp[i]=p[i]+dt*k3[i];
+    att.step(tmp,k4);for(let i=0;i<3;i++)p[i]+=dt/6*(k1[i]+2*k2[i]+2*k3[i]+k4[i]);}
+  const A=[0,0,0],B=[0,0,0],C=[0,0,0],D=[0,0,0],E=[0,0,0];
+
+  const el=id=>document.getElementById(id);
+  const cv=el("cv"), ctx=cv.getContext("2d");
+  const prog=el("prog");
+  const controls={};
+  ["seed","family","trace","scale","weight","quality","yaw","pitch","roll","depth","persp",
+   "exposure","gamma","bloom","haze","palette","cmode","hue","sat","chroma","grain","imprint"].forEach(id=>controls[id]=el(id));
+
+  function syncLabels(){
+    el("vTrace").textContent=(+controls.trace.value).toFixed(2);
+    el("vScale").textContent=(+controls.scale.value).toFixed(2);
+    el("vWeight").textContent=(+controls.weight.value).toFixed(2);
+    el("vYaw").textContent=(+controls.yaw.value).toFixed(2);
+    el("vPitch").textContent=(+controls.pitch.value).toFixed(2);
+    el("vRoll").textContent=(+controls.roll.value).toFixed(2);
+    el("vDepth").textContent=(+controls.depth.value).toFixed(2);
+    el("vPersp").textContent=(+controls.persp.value).toFixed(2);
+    el("vExp").textContent=(+controls.exposure.value).toFixed(2);
+    el("vGamma").textContent=(+controls.gamma.value).toFixed(2);
+    el("vBloom").textContent=(+controls.bloom.value).toFixed(2);
+    el("vHaze").textContent=(+controls.haze.value).toFixed(2);
+    el("vHue").textContent=(+controls.hue.value).toFixed(2);
+    el("vSat").textContent=(+controls.sat.value).toFixed(2);
+    el("vChr").textContent=(+controls.chroma.value).toFixed(1);
+    el("vGrain").textContent=(+controls.grain.value).toFixed(3);
+  }
+
+  const Q_RES=[0,760,1000,1240,1500];
+  const Q_PTS=[0,90000,150000,230000,340000];
+  let fW=1000,fH=1000;
+  let accR,accG,accB;          // filament (sharp)
+  let hzR,hzG,hzB;             // haze (soft)
+  let glowSmall,glowW,glowH;
+  let running=false;
+  let cur={};
+
+  function readLook(){
+    return { exposure:+controls.exposure.value, gamma:+controls.gamma.value, bloom:+controls.bloom.value,
+      haze:+controls.haze.value, hue:+controls.hue.value, sat:+controls.sat.value,
+      chroma:+controls.chroma.value, grain:+controls.grain.value };
+  }
+
+  function splatSharp(x,y,rad,r,g,b){
+    const W=fW,H=fH;
+    const x0=Math.max(0,(x-rad)|0),x1=Math.min(W-1,(x+rad)|0),y0=Math.max(0,(y-rad)|0),y1=Math.min(H-1,(y+rad)|0);
+    const inv=1/(rad*rad*0.5+1e-6);
+    for(let yy=y0;yy<=y1;yy++){const dy=yy-y,row=yy*W;
+      for(let xx=x0;xx<=x1;xx++){const dx=xx-x,w=Math.exp(-(dx*dx+dy*dy)*inv);if(w<0.004)continue;const i=row+xx;accR[i]+=r*w;accG[i]+=g*w;accB[i]+=b*w;}}
+  }
+  function splatHaze(x,y,rad,r,g,b){
+    const W=fW,H=fH;
+    const x0=Math.max(0,(x-rad)|0),x1=Math.min(W-1,(x+rad)|0),y0=Math.max(0,(y-rad)|0),y1=Math.min(H-1,(y+rad)|0);
+    const inv=1/(rad*rad*0.5+1e-6);
+    for(let yy=y0;yy<=y1;yy++){const dy=yy-y,row=yy*W;
+      for(let xx=x0;xx<=x1;xx++){const dx=xx-x,w=Math.exp(-(dx*dx+dy*dy)*inv);if(w<0.004)continue;const i=row+xx;hzR[i]+=r*w;hzG[i]+=g*w;hzB[i]+=b*w;}}
+  }
+
+  function beginPlate(){
+    if(running) return;
+    running=true; setBusy(true);
+    prog.classList.add("on"); prog.querySelector("i").style.width="0%";
+
+    const seed=controls.seed.value.trim()||"GYRE";
+    const q=+controls.quality.value, res=Q_RES[q];
+    fW=fH=res; if(cv.width!==res){cv.width=res;cv.height=res;}
+    accR=new Float32Array(res*res);accG=new Float32Array(res*res);accB=new Float32Array(res*res);
+    hzR=new Float32Array(res*res);hzG=new Float32Array(res*res);hzB=new Float32Array(res*res);
+    glowW=res>>2; glowH=res>>2; glowSmall=new Float32Array(glowW*glowH);
+
+    const seedRng=mulberry32(xmur3(seed)());
+    let fam=controls.family.value;
+    if(fam==="auto"){ fam=["lorenz","thomas","aizawa","halvorsen","dadras","four_wing"][(seedRng()*6)|0]; }
+    const att=makeAttractor(fam);
+
+    const trace=+controls.trace.value, scaleC=+controls.scale.value, weight=+controls.weight.value;
+    const nPts=Math.round(Q_PTS[q]*trace);
+    // seeded default orientation + user offsets
+    const baseYaw=seedRng()*TAU, basePitch=seedRng()*TAU, baseRoll=seedRng()*TAU;
+    cur={ seed, fam, trace, scaleC, weight, quality:q,
+          rx:basePitch, ry:baseYaw, rz:baseRoll };
+
+    // integrate the orbit (store points)
+    const pts=new Float32Array(nPts*3);
+    const p=[att.start[0],att.start[1],att.start[2]];
+    for(let i=0;i<att.warm;i++) rk4(att,p);
+    let cx=0,cy=0,cz=0;
+    for(let i=0;i<nPts;i++){ rk4(att,p);
+      if(!isFinite(p[0])){ p[0]=att.start[0];p[1]=att.start[1];p[2]=att.start[2]; }
+      pts[i*3]=p[0];pts[i*3+1]=p[1];pts[i*3+2]=p[2]; cx+=p[0];cy+=p[1];cz+=p[2]; }
+    cx/=nPts;cy/=nPts;cz/=nPts;
+    let maxr=1e-6;
+    for(let i=0;i<nPts;i++){const dx=pts[i*3]-cx,dy=pts[i*3+1]-cy,dz=pts[i*3+2]-cz;const r=Math.hypot(dx,dy,dz);if(r>maxr)maxr=r;}
+    const sc=1/maxr;
+
+    cur.pts=pts; cur.nPts=nPts; cur.cx=cx; cur.cy=cy; cur.cz=cz; cur.sc=sc;
+
+    // draw (chunked)
+    drawFilament(()=>{ finishAccum(); });
+  }
+
+  function orientation(){
+    const rx=cur.rx + (+controls.pitch.value), ry=cur.ry + (+controls.yaw.value), rz=cur.rz + (+controls.roll.value);
+    return {cxr:Math.cos(rx),sxr:Math.sin(rx),cyr:Math.cos(ry),syr:Math.sin(ry),czr:Math.cos(rz),szr:Math.sin(rz)};
+  }
+
+  function drawFilament(done){
+    const {pts,nPts,cx,cy,cz,sc}=cur;
+    const res=fW;
+    const O=orientation();
+    const {cxr,sxr,cyr,syr,czr,szr}=O;
+    const depthCue=+controls.depth.value, perspAmt=+controls.persp.value;
+    const camD=3.0, fscr=res*0.46*cur.scaleC, fFoc=2.4;
+    const cmode=controls.cmode.value;
+    const look=readLook();
+    let rampName=controls.palette.value; if(!RAMPS[rampName]) rampName="aurora";
+    const LUT=buildLUT(RAMPS[rampName], clamp(look.sat,0,1), look.hue);
+    const col=[0,0,0], o=[0,0,0], pr=[0,0,0];
+    const hazeAmt=look.haze;
+    const weight=cur.weight;
+
+    // speed range (precompute rough) for speed colouring
+    let i=0;
+    let prevSX=0,prevSY=0,has=false;
+
+    function rot(x,y,z){
+      let y1=y*cxr-z*sxr, z1=y*sxr+z*cxr;
+      let x2=x*cyr+z1*syr, z2=-x*syr+z1*cyr;
+      let x3=x2*czr-y1*szr, y3=x2*szr+y1*czr;
+      o[0]=x3;o[1]=y3;o[2]=z2;
+    }
+
+    function tick(){
+      const t0=performance.now();
+      while(i<nPts && performance.now()-t0<26){
+        const end=Math.min(nPts, i+4000);
+        for(; i<end; i++){
+          const x=(pts[i*3]-cx)*sc, y=(pts[i*3+1]-cy)*sc, z=(pts[i*3+2]-cz)*sc;
+          rot(x,y,z);
+          const zc=lerp(1.0, o[2]+camD, perspAmt);       // perspective blend
+          const persp=fFoc/Math.max(0.35,zc);
+          const sx=res/2+o[0]*persp*fscr, sy=res/2+o[1]*persp*fscr;
+          const depth=clamp((o[2]+1)/2,0,1);              // 0 far, 1 near
+          let u;
+          if(cmode==="length") u=fract(i/nPts*3);
+          else if(cmode==="speed"){ const dx=sx-prevSX,dy=sy-prevSY; u=clamp(Math.hypot(dx,dy)/ (res*0.02),0,1); }
+          else u=depth;
+          lutRGB(LUT,u,col);
+          const bright=lerp(1.0, lerp(0.22,1.15,depth), depthCue);
+          const rad=lerp(0.6,1.5,depth)*weight;
+          if(has){
+            const dx=sx-prevSX,dy=sy-prevSY,dist=Math.hypot(dx,dy);
+            if(dist<res*0.25){
+              const steps=Math.max(1,Math.min(8,dist|0));
+              for(let s=0;s<steps;s++){const tt=s/steps,px=prevSX+dx*tt,py=prevSY+dy*tt;
+                splatSharp(px,py,rad, col[0]*bright*0.42,col[1]*bright*0.42,col[2]*bright*0.42);}
+            }
+          }
+          // haze: occasional soft wide splat (volumetric glow around the body)
+          if(hazeAmt>0 && (i&7)===0){
+            const hb=bright*hazeAmt*0.08;
+            splatHaze(sx,sy,res*0.02*(0.6+0.8*depth), col[0]*hb,col[1]*hb,col[2]*hb);
+          }
+          prevSX=sx;prevSY=sy;has=true;
+        }
+        prog.querySelector("i").style.width=Math.round(i/nPts*100)+"%";
+      }
+      if(i<nPts) requestAnimationFrame(tick);
+      else done();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function finishAccum(){
+    running=false;
+    develop();
+    prog.classList.remove("on");
+    setBusy(false);
+    updateLabel();
+  }
+
+  function boxBlur3(buf,W,H,r){
+    const tmp=new Float32Array(buf.length),norm=1/(2*r+1);
+    for(let y=0;y<H;y++){let acc=0;const row=y*W;for(let k=-r;k<=r;k++)acc+=buf[row+clamp(k,0,W-1)];
+      for(let x=0;x<W;x++){tmp[row+x]=acc*norm;acc+=buf[row+clamp(x+r+1,0,W-1)]-buf[row+clamp(x-r,0,W-1)];}}
+    for(let x=0;x<W;x++){let acc=0;for(let k=-r;k<=r;k++)acc+=tmp[clamp(k,0,H-1)*W+x];
+      for(let y=0;y<H;y++){buf[y*W+x]=acc*norm;acc+=tmp[clamp(y+r+1,0,H-1)*W+x]-tmp[clamp(y-r,0,H-1)*W+x];}}
+  }
+
+  function develop(){
+    if(!accR) return;
+    const look=readLook();
+    const W=fW,H=fH,N=W*H;
+    const exp=look.exposure, gm=look.gamma, haze=look.haze;
+    // soften the haze buffer
+    if(haze>0){ boxBlur3(hzR,W,H,2);boxBlur3(hzG,W,H,2);boxBlur3(hzB,W,H,2); }
+    const baseR=new Float32Array(N),baseG=new Float32Array(N),baseB=new Float32Array(N);
+    glowSmall.fill(0);
+    for(let i=0;i<N;i++){
+      let r=(accR[i]+hzR[i])*exp, g=(accG[i]+hzG[i])*exp, b=(accB[i]+hzB[i])*exp;
+      r=r/(1+r); g=g/(1+g); b=b/(1+b);
+      r=Math.pow(r,gm); g=Math.pow(g,gm); b=Math.pow(b,gm);
+      baseR[i]=r; baseG[i]=g; baseB[i]=b;
+      const lum=0.299*r+0.587*g+0.114*b;
+      if(lum>0.42){ const gs=(lum-0.42); const gx=(i%W)>>2, gy=((i/W)|0)>>2; glowSmall[gy*glowW+gx]+=gs*gs; }
+    }
+    if(look.bloom>0){ boxBlur3(glowSmall,glowW,glowH,3); boxBlur3(glowSmall,glowW,glowH,3);
+      let gmx=1e-6; for(let i=0;i<glowSmall.length;i++) if(glowSmall[i]>gmx)gmx=glowSmall[i];
+      const gi=1/gmx; for(let i=0;i<glowSmall.length;i++) glowSmall[i]*=gi; }
+
+    const img=ctx.createImageData(W,H), data=img.data;
+    const cxp=W/2,cyp=H/2,maxR=Math.hypot(cxp,cyp);
+    const ca=look.chroma, bloom=look.bloom, grain=look.grain, gW=glowW,gH=glowH;
+    const grnd=mulberry32(xmur3(cur.seed+"|grain")());
+    const GT=4096,gtab=new Float32Array(GT); for(let i=0;i<GT;i++) gtab[i]=grnd()-0.5;
+    function sampBloom(x,y){const gx=x/4,gy=y/4;let x0=gx|0,y0=gy|0;const fx=gx-x0,fy=gy-y0;let x1=x0+1<gW?x0+1:x0,y1=y0+1<gH?y0+1:y0;if(x0<0)x0=0;if(y0<0)y0=0;
+      const a=glowSmall[y0*gW+x0],b=glowSmall[y0*gW+x1],c=glowSmall[y1*gW+x0],e=glowSmall[y1*gW+x1];return(a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+e*fx)*fy;}
+    function samp(buf,x,y){if(x<0)x=0;else if(x>=W)x=W-1;if(y<0)y=0;else if(y>=H)y=H-1;return buf[(y|0)*W+(x|0)];}
+    let gi=0;
+    for(let y=0;y<H;y++){const dy=y-cyp;
+      for(let x=0;x<W;x++){const i=y*W+x,dx=x-cxp;const hyp=Math.hypot(dx,dy)||1,rr=hyp/maxR;
+        const off=ca*rr*rr,ux=dx/hyp,uy=dy/hyp;
+        let R=ca>0?samp(baseR,x+ux*off,y+uy*off):baseR[i];
+        let G=baseG[i];
+        let B=ca>0?samp(baseB,x-ux*off,y-uy*off):baseB[i];
+        if(bloom>0){const gl=sampBloom(x,y)*bloom;R=1-(1-R)*(1-gl);G=1-(1-G)*(1-gl*0.96);B=1-(1-B)*(1-gl*0.88);}
+        const vig=1-0.5*rr*rr*rr;R*=vig;G*=vig;B*=vig;
+        if(grain>0){const n=gtab[(gi++)&(GT-1)]*grain;R+=n;G+=n;B+=n;}
+        const o2=i*4;data[o2]=clamp(R,0,1)*255;data[o2+1]=clamp(G,0,1)*255;data[o2+2]=clamp(B,0,1)*255;data[o2+3]=255;
+      }}
+    ctx.putImageData(img,0,0);
+  }
+
+  // ---- ui ----
+  function setBusy(b){ ["btnNew","btnRender","btnExport"].forEach(id=>el(id).disabled=b); }
+  function updateLabel(){
+    el("lblLeft").textContent="GYRE · "+cur.fam;
+    el("lblRight").innerHTML="SEED "+esc(cur.seed)+"<br>"+cur.fam+" · orbit "+cur.trace.toFixed(2);
+  }
+  function esc(s){ return String(s).replace(/[<>&]/g,m=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[m])); }
+
+  const PALETTES={ aurora:{sat:0.9}, plasma:{sat:0.92}, spectral:{sat:0.95}, astra:{sat:0.85}, ice:{sat:0.85}, ember:{sat:0.92}, custom:{sat:0.9} };
+  controls.palette.addEventListener("change",()=>{
+    const p=PALETTES[controls.palette.value]; if(p){ controls.sat.value=p.sat; }
+    syncLabels(); if(!running) beginPlate();
+  });
+
+  function randomSeed(){
+    const words=["GYRE","AXIS","VORTEX","ANIMA","PNEUMA","HELIX","ORBIS","AETHER","CAELUM","NOCTIS","LUMEN","VOLUTE","SPIRA","MONAD","ORACLE","EMPYREAN","ZEPHYR","SIGIL"];
+    const r=Math.random;
+    return words[(r()*words.length)|0]+"-"+Math.floor(r()*9000+1000);
+  }
+  function newPlate(){
+    controls.seed.value=randomSeed();
+    const sr=mulberry32(xmur3(controls.seed.value)());
+    controls.trace.value=(0.7+sr()*0.7).toFixed(2);
+    controls.scale.value=(0.8+sr()*0.35).toFixed(2);
+    // reset view offsets so the seeded orientation shows
+    controls.yaw.value=0; controls.pitch.value=0; controls.roll.value=0;
+    syncLabels();
+    beginPlate();
+  }
+
+  // form/view/colour that feed accumulation -> re-accumulate
+  ["family","trace","scale","weight","quality","yaw","pitch","roll","depth","persp","cmode","hue","sat"].forEach(id=>{
+    controls[id].addEventListener("input",()=>{ syncLabels(); });
+    controls[id].addEventListener("change",()=>{ syncLabels(); if(!running) beginPlate(); });
+  });
+  // post-process only -> re-develop
+  ["exposure","gamma","bloom","chroma","grain"].forEach(id=>{
+    controls[id].addEventListener("input",()=>{ syncLabels(); });
+    controls[id].addEventListener("change",()=>{ syncLabels(); if(!running) develop(); });
+  });
+  // haze contributes to buffers -> re-accumulate
+  controls.haze.addEventListener("input",()=>{ syncLabels(); });
+  controls.haze.addEventListener("change",()=>{ if(!running) beginPlate(); });
+  controls.seed.addEventListener("change",()=>{ beginPlate(); });
+
+  el("btnNew").addEventListener("click",newPlate);
+  el("btnRender").addEventListener("click",()=>{ if(!running) develop(); });
+  el("btnCopy").addEventListener("click",()=>{ navigator.clipboard&&navigator.clipboard.writeText(controls.seed.value); });
+  el("btnExport").addEventListener("click",()=>{
+    if(controls.imprint.checked){
+      ctx.save();ctx.font=`${Math.round(fW*0.014)}px "Space Mono", monospace`;
+      ctx.fillStyle="rgba(235,220,185,0.66)";ctx.textBaseline="bottom";
+      ctx.fillText("GYRE · "+cur.seed, fW*0.03, fH*0.975);ctx.restore();
+    }
+    cv.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);
+      a.download="gyre_"+cur.seed.replace(/[^A-Za-z0-9_-]/g,"")+".png";a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+      if(controls.imprint.checked && !running) develop();},"image/png");
+  });
+
+  controls.seed.value=randomSeed();
+  syncLabels();
+  window.addEventListener("load",()=>{ beginPlate(); });
+  if(document.readyState==="complete") beginPlate();
+</script>
+</body>
+</html>

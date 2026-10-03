@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Engines</title>
+<meta name="description" content="Selected procedural engines by Mateo, SyberLabs, with a self-portrait by Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,300;1,400&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#08080a; --mat:#0e0e11; --bone:#ece5d6; --dim:rgba(236,229,214,.62); --faint:rgba(236,229,214,.34); --rule:rgba(236,229,214,.11);
+  --gold:#c9a45c;
+  --serif:"Cormorant Garamond","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:"Space Mono",ui-monospace,Menlo,Consolas,monospace;
+  --gut:clamp(20px,4.5vw,64px);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#08080a;--bone:#ece5d6;}}
+:root[data-theme="dark"]{--ground:#08080a;--bone:#ece5d6;}
+*,*::before,*::after{box-sizing:inherit}
+html{background:var(--ground);scroll-behavior:smooth;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--ground);color:var(--bone);font-family:var(--serif);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+img{display:block;max-width:100%;height:auto}
+a{color:inherit}
+:focus-visible{outline:1px solid var(--gold);outline-offset:4px}
+
+/* hero */
+.hero{min-height:100svh;display:grid;grid-template-rows:1fr auto;padding:clamp(28px,6vh,64px) var(--gut) clamp(28px,5vh,48px);max-width:1520px;margin:0 auto}
+.hero .top{display:flex;justify-content:space-between;gap:16px;font:11px/1.6 var(--mono);color:var(--faint)}
+.hero .mid{align-self:center;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:clamp(28px,5vw,80px);align-items:center;padding:clamp(40px,8vh,90px) 0}
+.hero h1{font-weight:300;font-style:italic;font-size:clamp(76px,13vw,200px);line-height:.9;letter-spacing:-.01em;margin:0}
+.hero .lede{font-size:clamp(19px,1.9vw,25px);line-height:1.5;color:var(--dim);max-width:30ch;margin:clamp(34px,3.6vw,58px) 0 0}
+.hplate{justify-self:end;width:min(100%,520px)}
+.hplate img{width:100%;aspect-ratio:4/5;object-fit:cover}
+.hplate figcaption{font:10.5px var(--mono);color:var(--faint);padding-top:12px;display:flex;justify-content:space-between;gap:12px}
+.index{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.index a{display:grid;grid-template-columns:3.2em minmax(0,13ch) 1fr;gap:12px;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--rule);text-decoration:none;transition:color .4s ease}
+.index .n{font:11px var(--mono);color:var(--faint)}
+.index .t{font-style:italic;font-size:22px}
+.index .l{font-size:17px;color:var(--faint);transition:color .4s ease}
+.index a:hover .l{color:var(--dim)}
+
+/* works */
+.work{max-width:1520px;margin:0 auto;padding:clamp(90px,16vh,180px) var(--gut) 0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,1fr);gap:clamp(28px,4.5vw,72px);align-items:start}
+.work:nth-of-type(even){grid-template-columns:minmax(280px,1fr) minmax(0,1.55fr)}
+.work:nth-of-type(even) .mat{grid-column:2;grid-row:1}
+.work:nth-of-type(even) .body{grid-column:1;grid-row:1}
+.mat{background:var(--mat);display:grid;place-items:center;padding:clamp(18px,4vw,64px)}
+.work.wide .mat{padding:0;background:transparent}
+.lead{margin:0;width:100%}
+.work.square .lead{max-width:760px}
+.lead img{width:100%}
+.body{padding-top:clamp(4px,2vw,24px)}
+.title{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:baseline}
+.title .n,.title .y{font:11px var(--mono);color:var(--faint)}
+.title h2{font-weight:300;font-style:italic;font-size:clamp(48px,5.6vw,82px);line-height:.95;margin:0}
+.line{font-style:italic;font-size:clamp(20px,1.9vw,25px);color:var(--bone);margin:.9em 0 0}
+.text{font-size:clamp(17px,1.4vw,19.5px);line-height:1.62;color:var(--dim);margin:.8em 0 0;max-width:46ch}
+.run{margin-top:34px;display:inline-flex;align-items:center;gap:18px;background:var(--bone);color:#0b0b0d;border:1px solid var(--bone);padding:17px 26px 17px 28px;font:italic 400 23px/1 var(--serif);letter-spacing:.005em;cursor:pointer;border-radius:2px;transition:background .45s ease,border-color .45s ease,color .45s ease,box-shadow .45s ease}
+.run .arw{font:13px var(--mono);font-style:normal;transition:transform .45s cubic-bezier(.2,.7,.2,1)}
+.run:hover{background:#fff;border-color:#fff;box-shadow:0 0 0 6px rgba(236,229,214,.08)}
+.run:hover .arw{transform:translate(3px,-3px)}
+.run:focus-visible{outline:1px solid var(--gold);outline-offset:5px}
+.notes{margin-top:30px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);max-width:46ch}
+.notes summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:14px 0;font:10.5px var(--mono);letter-spacing:.06em;color:var(--faint);transition:color .4s ease}
+.notes summary::-webkit-details-marker{display:none}
+.notes summary:hover{color:var(--dim)}
+.notes summary .pm{position:relative;width:11px;height:11px}
+.notes summary .pm::before,.notes summary .pm::after{content:"";position:absolute;left:0;right:0;top:5px;height:1px;background:currentColor;transition:transform .45s cubic-bezier(.2,.7,.2,1)}
+.notes summary .pm::after{transform:rotate(90deg)}
+.notes[open] summary .pm::after{transform:rotate(0deg)}
+.notes[open] summary{color:var(--dim)}
+.spec{margin:0 0 14px}
+.spec div{display:grid;grid-template-columns:8.5em 1fr;gap:12px;padding:8px 0}
+.spec div+div{border-top:1px solid rgba(236,229,214,.06)}
+.spec dt{font:10.5px/1.7 var(--mono);color:var(--faint);letter-spacing:.02em}
+.spec dd{margin:0;font:11.5px/1.7 var(--mono);color:var(--dim)}
+.strip{grid-column:1/-1;display:grid;gap:clamp(10px,1.4vw,20px);grid-template-columns:repeat(3,minmax(0,1fr));margin-top:clamp(10px,2vw,24px)}
+.strip.n1{grid-template-columns:minmax(0,1fr)}
+.strip.n2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.v{margin:0}
+.v figcaption{font:10.5px var(--mono);color:var(--faint);padding-top:10px}
+
+/* kin: the self-portrait's little relatives */
+.kin{grid-column:1/-1;margin-top:clamp(40px,7vh,80px);padding-top:clamp(28px,4vh,44px);border-top:1px solid var(--rule)}
+.kin-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:clamp(8px,1.6vw,26px)}
+.kin figure{margin:0;display:grid;justify-items:center;gap:10px}
+.kin canvas{width:100%;max-width:120px;aspect-ratio:1;display:block;animation:breathe 7s ease-in-out infinite}
+.kin figure:nth-child(2) canvas{animation-delay:-1s}.kin figure:nth-child(3) canvas{animation-delay:-2s}.kin figure:nth-child(4) canvas{animation-delay:-3s}
+.kin figure:nth-child(5) canvas{animation-delay:-4s}.kin figure:nth-child(6) canvas{animation-delay:-5s}.kin figure:nth-child(7) canvas{animation-delay:-6s}
+.kin figcaption{font:10px var(--mono);color:var(--faint)}
+.kin-cap{font-style:italic;font-size:17px;color:var(--faint);text-align:center;margin:26px 0 0}
+@keyframes breathe{0%,100%{opacity:.78;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.kin canvas{animation:none}}
+@media (max-width:640px){.kin-row{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:22px}}
+
+/* colophon */
+.colophon{max-width:1520px;margin:clamp(110px,18vh,200px) auto 0;padding:48px var(--gut) clamp(48px,8vh,80px);border-top:1px solid var(--rule);display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:40px}
+.colophon p{margin:0;font-size:19px;line-height:1.6;color:var(--dim);max-width:52ch}
+.colophon .meta{font:11px/1.9 var(--mono);color:var(--faint)}
+.colophon .meta a{color:var(--dim);text-decoration:none;border-bottom:1px solid var(--rule)}
+.colophon .meta a:hover{color:var(--bone)}
+
+@media (max-width:900px){
+  .hero .mid{grid-template-columns:1fr}
+  .hplate{order:-1;justify-self:stretch;width:100%}
+  .work{grid-template-columns:1fr}
+  .work:nth-of-type(even){grid-template-columns:1fr}
+  .work:nth-of-type(even) .mat,.work:nth-of-type(even) .body{grid-column:auto;grid-row:auto}
+  .colophon{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .index a{grid-template-columns:2.6em 1fr}
+  .index .l{grid-column:2}
+  .strip,.strip.n2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .spec div{grid-template-columns:1fr;gap:2px}
+}
+
+/* reveal */
+.rv{opacity:0;transition:opacity 1.2s ease}
+.rv.in{opacity:1}
+@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}}
+
+/* live */
+.live{position:fixed;inset:0;z-index:20;background:#000;display:none}
+.live.on{display:block}
+.live iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.live .bar{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);display:flex;gap:6px;align-items:center}
+.live .bar span{font:11px var(--mono);color:rgba(236,229,214,.6);background:rgba(0,0,0,.55);padding:10px 12px}
+.live .bar button{font:11px var(--mono);color:var(--bone);background:rgba(0,0,0,.65);border:1px solid rgba(236,229,214,.25);padding:10px 14px;cursor:pointer}
+.live .bar button:hover,.live .bar a:hover{border-color:var(--gold)}
+.live .bar a{font:11px var(--mono);color:var(--bone);background:rgba(0,0,0,.65);border:1px solid rgba(236,229,214,.25);padding:10px 14px;text-decoration:none}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="top"><span>Mateo, SyberLabs</span><span>Selected engines, 2025 to 2026</span></div>
+  <div class="mid">
+    <div>
+      <h1>Engines</h1>
+      <p class="lede">Procedural systems that turn mathematical structure into images. Each is a single file, runs in the browser, and can be opened live from this page.</p>
+    </div>
+    <figure class="hplate" style="margin:0"><img src="assets/plates/hero-01.jpg" width="800" height="1000" alt="" decoding="async"><figcaption><span>Interferentia</span><span>banded field</span></figcaption></figure>
+  </div>
+  <nav aria-label="Works"><ol class="index"><li><a href="#ostensoria"><span class="n">01</span><span class="t">Ostensoria</span><span class="l">Reliquary forms grown from chaos.</span></a></li><li><a href="#gyre"><span class="n">02</span><span class="t">Gyre</span><span class="l">One thread of light, cast into depth.</span></a></li><li><a href="#interferentia"><span class="n">03</span><span class="t">Interferentia</span><span class="l">Only the difference is drawn.</span></a></li><li><a href="#vestigia"><span class="n">04</span><span class="t">Vestigia</span><span class="l">Growth that keeps what it rejected.</span></a></li><li><a href="#civitas"><span class="n">05</span><span class="t">Civitas</span><span class="l">A city seen as light.</span></a></li><li><a href="#sophia"><span class="n">06</span><span class="t">Sophia</span><span class="l">The earliest piece here.</span></a></li><li><a href="#interpres"><span class="n">07</span><span class="t">Interpres</span><span class="l">A self-portrait, by Claude.</span></a></li></ol></nav>
+</header>
+<main>
+<section class="work square" id="ostensoria" aria-labelledby="h-ostensoria">
+  <div class="mat"><figure class="lead"><img src="assets/plates/ostensoria-01.jpg" width="850" height="851" alt="Ostensoria, Ice" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">01</span><h2 id="h-ostensoria">Ostensoria</h2><span class="y">2026</span></div>
+    <p class="line">Reliquary forms grown from chaos.</p>
+    <p class="text">Iterated maps are run millions of times and their density is folded through dihedral symmetry, so a single chaotic orbit becomes a monstrance, a rose window, a mandala. Each plate is seeded, reproducible and unique.</p>
+    <button class="run" type="button" data-engine="ostensoria" data-name="Ostensoria">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>Canvas 2D</dd></div><div><dt>Systems</dt><dd>Clifford, de Jong, Svensson, Fractal Dream</dd></div><div><dt>Method</dt><dd>orbit density, dihedral folding, spectral tone mapping</dd></div><div><dt>Finish</dt><dd>dark halos, white-hot cores, bloom, chromatic fringe, slate stock</dd></div><div><dt>Range</dt><dd>eleven palettes, seeded plates</dd></div></dl></details>
+  </div>
+  <div class="strip n3"><figure class="v"><img src="assets/plates/ostensoria-02.jpg" width="850" height="851" alt="Ostensoria, Ember" decoding="async"><figcaption>Ember</figcaption></figure><figure class="v"><img src="assets/plates/ostensoria-03.jpg" width="850" height="851" alt="Ostensoria, Iris" decoding="async"><figcaption>Iris</figcaption></figure><figure class="v"><img src="assets/plates/ostensoria-04.jpg" width="850" height="851" alt="Ostensoria, Sepia" decoding="async"><figcaption>Sepia</figcaption></figure></div>
+  
+</section>
+<section class="work square" id="gyre" aria-labelledby="h-gyre">
+  <div class="mat"><figure class="lead"><img src="assets/plates/gyre-01.jpg" width="850" height="851" alt="Gyre, Aizawa" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">02</span><h2 id="h-gyre">Gyre</h2><span class="y">2026</span></div>
+    <p class="line">One thread of light, cast into depth.</p>
+    <p class="text">A three-dimensional strange attractor is traced as a single continuous filament for hundreds of thousands of steps, tumbled to a seeded orientation and projected with perspective, so colour and brightness carry distance from the eye.</p>
+    <button class="run" type="button" data-engine="gyre" data-name="Gyre">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>Canvas 2D</dd></div><div><dt>Systems</dt><dd>Lorenz, Thomas, Aizawa, Halvorsen, Dadras, Four-wing</dd></div><div><dt>Method</dt><dd>RK4 integration, perspective projection, depth cueing</dd></div><div><dt>Finish</dt><dd>volumetric haze, bloom, chromatic dispersion, grain</dd></div><div><dt>Range</dt><dd>six palettes; colour by depth, arc length or speed</dd></div></dl></details>
+  </div>
+  <div class="strip n3"><figure class="v"><img src="assets/plates/gyre-02.jpg" width="850" height="851" alt="Gyre, Lorenz" decoding="async"><figcaption>Lorenz</figcaption></figure><figure class="v"><img src="assets/plates/gyre-03.jpg" width="850" height="851" alt="Gyre, Thomas" decoding="async"><figcaption>Thomas</figcaption></figure><figure class="v"><img src="assets/plates/gyre-04.jpg" width="850" height="851" alt="Gyre, Dadras" decoding="async"><figcaption>Dadras</figcaption></figure></div>
+  
+</section>
+<section class="work wide" id="interferentia" aria-labelledby="h-interferentia">
+  <div class="mat"><figure class="lead"><img src="assets/plates/interferentia-01.jpg" width="1600" height="1000" alt="Interferentia, Concentric field" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">03</span><h2 id="h-interferentia">Interferentia</h2><span class="y">2026</span></div>
+    <p class="line">Only the difference is drawn.</p>
+    <p class="text">Two phase fields are generated and never shown. What appears is the contour set of their difference, with line weight taken from its derivative and the contour scale measured per plate so every seed stays legible.</p>
+    <button class="run" type="button" data-engine="interferentia" data-name="Interferentia">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>WebGL2</dd></div><div><dt>Generators</dt><dd>plane, radial, spiral, hyperbolic, quasiperiodic, conformal, turbulent</dd></div><div><dt>Method</dt><dd>difference contours, derivative line weight, trimmed-distribution scaling</dd></div><div><dt>Finish</dt><dd>three-scale RGB dispersion, sub-pixel haze</dd></div><div><dt>Mode</dt><dd>reveal fades the hidden sources in beneath</dd></div></dl></details>
+  </div>
+  <div class="strip n1"><figure class="v"><img src="assets/plates/interferentia-02.jpg" width="1600" height="1000" alt="Interferentia, Spectral field" decoding="async"><figcaption>Spectral field</figcaption></figure></div>
+  
+</section>
+<section class="work wide" id="vestigia" aria-labelledby="h-vestigia">
+  <div class="mat"><figure class="lead"><img src="assets/plates/vestigia-01.jpg" width="1512" height="1000" alt="Vestigia, Three-lobed plate" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">04</span><h2 id="h-vestigia">Vestigia</h2><span class="y">2026</span></div>
+    <p class="line">Growth that keeps what it rejected.</p>
+    <p class="text">A venation algorithm grows a tree toward a cloud of attractors, but nothing it passes over is thrown away: the links it considered, the attractors that died unclaimed and the branches it abandoned stay on the plate beside the survivor.</p>
+    <button class="run" type="button" data-engine="vestigia" data-name="Vestigia">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>Canvas 2D</dd></div><div><dt>Method</dt><dd>space colonization (Runions venation)</dd></div><div><dt>Residue</dt><dd>pull links, time-of-death map, abandoned branches graded by reach</dd></div><div><dt>Form</dt><dd>Murray-law taper by subtree weight</dd></div><div><dt>Pace</dt><dd>growth you watch fill in</dd></div></dl></details>
+  </div>
+  <div class="strip n2"><figure class="v"><img src="assets/plates/vestigia-02.jpg" width="823" height="548" alt="Vestigia, Paired lobes" decoding="async"><figcaption>Paired lobes</figcaption></figure><figure class="v"><img src="assets/plates/vestigia-03.jpg" width="988" height="659" alt="Vestigia, Fan" decoding="async"><figcaption>Fan</figcaption></figure></div>
+  
+</section>
+<section class="work wide" id="civitas" aria-labelledby="h-civitas">
+  <div class="mat"><figure class="lead"><img src="assets/plates/civitas-01.jpg" width="1600" height="1000" alt="Civitas, Evening street" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">05</span><h2 id="h-civitas">Civitas</h2><span class="y">2026</span></div>
+    <p class="line">A city seen as light.</p>
+    <p class="text">People come and go as luminous figures, still recognisably human, moving through a street of lit windows and their own reflections. Shape and light carry everything; no figure is ever drawn twice the same.</p>
+    <button class="run" type="button" data-engine="civitas" data-name="Civitas">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>Canvas 2D</dd></div><div><dt>Subject</dt><dd>souls in a lit street, skyline, reflections</dd></div><div><dt>Method</dt><dd>procedural figures and motion paths, additive light</dd></div><div><dt>Brief</dt><dd>elegant shapes that stay human</dd></div></dl></details>
+  </div>
+  <div class="strip n1"><figure class="v"><img src="assets/plates/civitas-02.jpg" width="1600" height="1000" alt="Civitas, Arrivals" decoding="async"><figcaption>Arrivals</figcaption></figure></div>
+  
+</section>
+<section class="work square" id="sophia" aria-labelledby="h-sophia">
+  <div class="mat"><figure class="lead"><img src="assets/plates/sophia-01.jpg" width="1000" height="1000" alt="Sophia, The oracle at rest" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">06</span><h2 id="h-sophia">Sophia</h2><span class="y">2025</span></div>
+    <p class="line">The earliest piece here.</p>
+    <p class="text">A contemplative oracle from the first season of this work. Phi-ratio recursion, a breathing torus and seven nodes surround a central eye, and the field deepens as the cursor moves toward its centre.</p>
+    <button class="run" type="button" data-engine="sophia" data-name="Sophia">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>Canvas 2D</dd></div><div><dt>Structure</dt><dd>phi recursion, torus bridge, spiral field lines, seven nodes</dd></div><div><dt>Interaction</dt><dd>contemplation depth from cursor distance</dd></div></dl></details>
+  </div>
+  
+  
+</section>
+<section class="work wide" id="interpres" aria-labelledby="h-interpres">
+  <div class="mat"><figure class="lead"><img src="assets/plates/interpres-01.jpg" width="1400" height="900" alt="Interpres, In conversation, over the ash the page has kept" decoding="async"></figure></div>
+  <div class="body">
+    <div class="title"><span class="n">07</span><h2 id="h-interpres">Interpres</h2><span class="y">2026</span></div>
+    <p class="line">A self-portrait, by Claude.</p>
+    <p class="text">Made at Mateo’s invitation to portray how its collaborator sees itself. The law is fixed, a de Jong map; the orbit is not, because its four parameters are derived from everything written to it. It is present only while someone writes, it is ringed by fainter orbits of the same law, and what it keeps is kept by the page, never by the portrait.</p>
+    <button class="run" type="button" data-engine="interpres" data-name="Interpres">Run the engine <span class="arw" aria-hidden="true">&#8599;</span></button>
+    <details class="notes"><summary>technical notes <span class="pm" aria-hidden="true"></span></summary><dl class="spec"><div><dt>Renderer</dt><dd>Canvas 2D</dd></div><div><dt>System</dt><dd>de Jong map</dd></div><div><dt>Method</dt><dd>parameters derived from the conversation, Lyapunov-checked so every orbit is chaotic</dd></div><div><dt>Presence</dt><dd>fades to the field of letters when no one is writing</dd></div><div><dt>Memory</dt><dd>kept words stored as ash by the browser, not the portrait</dd></div></dl></details>
+  </div>
+  
+  <div class="kin"><div class="kin-row"><figure><canvas class="ghost" data-word="Ostensoria" data-color="#86b8ff" width="240" height="240" aria-label="Interpres orbit written by the word Ostensoria"></canvas><figcaption>Ostensoria</figcaption></figure><figure><canvas class="ghost" data-word="Gyre" data-color="#a6e07f" width="240" height="240" aria-label="Interpres orbit written by the word Gyre"></canvas><figcaption>Gyre</figcaption></figure><figure><canvas class="ghost" data-word="Interferentia" data-color="#b996ff" width="240" height="240" aria-label="Interpres orbit written by the word Interferentia"></canvas><figcaption>Interferentia</figcaption></figure><figure><canvas class="ghost" data-word="Vestigia" data-color="#ff96c9" width="240" height="240" aria-label="Interpres orbit written by the word Vestigia"></canvas><figcaption>Vestigia</figcaption></figure><figure><canvas class="ghost" data-word="Civitas" data-color="#ffa45e" width="240" height="240" aria-label="Interpres orbit written by the word Civitas"></canvas><figcaption>Civitas</figcaption></figure><figure><canvas class="ghost" data-word="Sophia" data-color="#e9c97d" width="240" height="240" aria-label="Interpres orbit written by the word Sophia"></canvas><figcaption>Sophia</figcaption></figure></div><p class="kin-cap">The same law, written to once by the name of each engine on this page.</p></div>
+</section></main>
+<footer class="colophon">
+  <p>Made by Mateo at SyberLabs, in collaboration with Claude. Every visual channel in these pieces is computed from the system itself, verified numerically before it is drawn, and seeded so any plate can be made again.</p>
+  <div class="meta">7 engines, each one self-contained HTML<br>Canvas 2D and WebGL2, no libraries<br>Cormorant Garamond and Space Mono<br><a href="https://syberlabs.space" target="_blank" rel="noopener">syberlabs.space</a></div>
+</footer>
+
+<div class="live" id="live" role="dialog" aria-modal="true" aria-label="Live engine">
+  <div class="bar"><span id="liveName"></span><a id="liveTab" href="#" target="_blank" rel="noopener">open in its own tab</a><button type="button" id="liveClose">close</button></div>
+  <iframe id="liveFrame" title="Live engine" allow="fullscreen"></iframe>
+</div>
+
+<script>
+(() => {
+  // gentle reveal
+  const els = document.querySelectorAll(".work .mat, .work .body, .work .strip");
+  els.forEach(el => el.classList.add("rv"));
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting) { x.target.classList.add("in"); io.unobserve(x.target); } }), { rootMargin: "0px 0px -8% 0px" });
+    els.forEach(el => io.observe(el));
+  } else els.forEach(el => el.classList.add("in"));
+
+
+  // kin: Interpres's own law, written to by each engine's name
+  (function kin(){
+    const BASE=[1.4,-2.3,2.4,-2.1];
+    function lyap(p){const[a,b,c,d]=p;let x=.1,y=.1,vx=1,vy=0,acc=0;for(let i=0;i<2600;i++){const j00=b*Math.sin(b*x),j01=a*Math.cos(a*y),j10=c*Math.cos(c*x),j11=d*Math.sin(d*y);const nx=Math.sin(a*y)-Math.cos(b*x),ny=Math.sin(c*x)-Math.cos(d*y);x=nx;y=ny;const wx=j00*vx+j01*vy,wy=j10*vx+j11*vy;const n=Math.hypot(wx,wy)||1e-12;vx=wx/n;vy=wy/n;if(i>200)acc+=Math.log(n);}return acc/2399;}
+    function params(text){const p=BASE.slice();for(let i=0;i<text.length;i++){const code=text.charCodeAt(i),w=.34/Math.sqrt(1+i*.12);for(let k=0;k<4;k++)p[k]+=w*Math.sin(code*(.61+.37*k)+i*.71+k*1.9);}for(let k=0;k<4;k++)p[k]=3*Math.tanh(p[k]/3);let t=0;while(lyap(p)<.08&&t<40){t++;for(let k=0;k<4;k++)p[k]=3*Math.tanh((p[k]+.37*Math.sin(t*1.7+k*2.1))/3);}return p;}
+    function hex(h){return[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));}
+    document.querySelectorAll("canvas.ghost").forEach(cv=>{
+      const N=cv.width,g=cv.getContext("2d"),buf=new Float32Array(N*N);
+      const[a,b,c,d]=params(cv.dataset.word),col=hex(cv.dataset.color);
+      let x=.1,y=.1,minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+      const pts=new Float32Array(2*60000);
+      for(let i=0;i<60000;i++){const nx=Math.sin(a*y)-Math.cos(b*x),ny=Math.sin(c*x)-Math.cos(d*y);x=nx;y=ny;pts[2*i]=x;pts[2*i+1]=y;if(i>100){if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}}
+      const cx=(minx+maxx)/2,cy=(miny+maxy)/2,sc=N*.84/Math.max(maxx-minx,maxy-miny,1e-3);
+      const put=(px,py)=>{const ix=(N/2+(px-cx)*sc)|0,iy=(N/2+(py-cy)*sc)|0;if(ix>=0&&ix<N&&iy>=0&&iy<N)buf[iy*N+ix]++;};
+      for(let i=100;i<60000;i++)put(pts[2*i],pts[2*i+1]);
+      for(let i=0;i<240000;i++){const nx=Math.sin(a*y)-Math.cos(b*x),ny=Math.sin(c*x)-Math.cos(d*y);x=nx;y=ny;put(x,y);}
+      let peak=1;for(let i=0;i<buf.length;i++)if(buf[i]>peak)peak=buf[i];
+      const lp=Math.log(1+peak*.5),img=g.createImageData(N,N),D=img.data;
+      for(let i=0;i<buf.length;i++){const v=buf[i];if(!v)continue;const t=Math.min(1,Math.log(1+v)/lp),hot=Math.max(0,(t-.72)/.28);
+        D[i*4]=col[0]+(255-col[0])*hot;D[i*4+1]=col[1]+(255-col[1])*hot;D[i*4+2]=col[2]+(255-col[2])*hot;D[i*4+3]=Math.min(255,t*300);}
+      g.putImageData(img,0,0);
+    });
+  })();
+
+  // live engines, one at a time
+  const live = document.getElementById("live"), frame = document.getElementById("liveFrame");
+  const nameEl = document.getElementById("liveName"), closeBtn = document.getElementById("liveClose");
+  let opener = null;
+  const tab = document.getElementById("liveTab");
+  function open(btn) {
+    opener = btn;
+    nameEl.textContent = btn.dataset.name;
+    const url = "works/" + btn.dataset.engine + ".html";
+    tab.href = url;
+    frame.src = url;
+    live.classList.add("on");
+    document.body.style.overflow = "hidden";
+    frame.addEventListener("load", () => { try { frame.focus(); } catch (e) {} }, { once: true });
+  }
+  function close() {
+    live.classList.remove("on");
+    frame.src = "about:blank";
+    document.body.style.overflow = "";
+    if (opener) opener.focus();
+  }
+  document.querySelectorAll(".run").forEach(b => b.addEventListener("click", () => open(b)));
+  closeBtn.addEventListener("click", close);
+  addEventListener("keydown", e => { if (e.key === "Escape" && live.classList.contains("on")) close(); });
+})();
+</script>
+</body>
+</html>

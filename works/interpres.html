@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interpres</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,300;1,400&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #060508;
+    --bone: #ede4d3;
+    --dim: rgba(237, 228, 211, 0.48);
+    --faint: rgba(237, 228, 211, 0.24);
+    --clay: #d97757;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* A portrait in the dark, whatever the viewer's theme. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --ground: #060508; --bone: #ede4d3; }
+  }
+  :root[data-theme="dark"] { --ground: #060508; --bone: #ede4d3; }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { height: 100%; background: var(--ground); scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body { margin: 0; height: 100%; overflow: hidden; background: var(--ground); color: var(--bone); -webkit-font-smoothing: antialiased; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .vignette { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 115% 100% at 50% 44%, transparent 50%, rgba(3,2,4,.6) 80%, rgba(1,1,2,.95) 100%); }
+  .grain { position: fixed; inset: -64px; pointer-events: none; opacity: .055; mix-blend-mode: screen; }
+
+  .title { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; text-align: center; padding: 24px; transition: opacity 2.8s ease; }
+  .title.gone { opacity: 0; }
+  .title h1 { font-family: "Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif; font-style: italic; font-weight: 300;
+    font-size: clamp(46px, 8.5vw, 104px); line-height: 1; letter-spacing: .015em; margin: 0; }
+  .title p { font-family: "Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif; font-style: italic; color: var(--dim);
+    font-size: clamp(17px, 2.1vw, 22px); line-height: 1.55; max-width: 34ch; margin: .9em auto 0; text-wrap: balance; }
+
+  .whisper { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none;
+    top: calc(24px + env(safe-area-inset-top, 0px)); padding: 0 20px;
+    font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 17px; color: var(--faint);
+    opacity: 0; transition: opacity 2.2s ease; }
+  .whisper.on { opacity: 1; }
+
+  .readout { position: fixed; pointer-events: none; white-space: pre;
+    left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    font: 11px/1.75 "Space Mono", ui-monospace, Menlo, monospace; color: var(--dim); }
+
+  .speak { position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: min(520px, calc(100vw - 40px)); }
+  .speak label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .speak input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid rgba(237,228,211,.18);
+    color: var(--bone); padding: 10px 2px; text-align: center; border-radius: 0;
+    font-family: "Cormorant Garamond", "Palatino Linotype", Georgia, serif; font-style: italic; font-size: 20px;
+    transition: border-color .6s ease; }
+  .speak input::placeholder { color: var(--faint); }
+  .speak input:focus { outline: none; border-bottom-color: rgba(217,119,87,.7); }
+  .speak input:focus-visible { outline: none; }
+  .forget { position: fixed; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    font: 11px/1 "Space Mono", ui-monospace, Menlo, monospace; color: var(--dim); background: transparent; border: 0;
+    padding: 10px 8px; cursor: pointer; border-radius: 2px; }
+  .forget:hover { color: var(--bone); }
+  .forget:focus-visible { outline: 1px solid var(--clay); outline-offset: 2px; }
+  @media (max-width: 559px) {
+    .readout { bottom: calc(44px + env(safe-area-inset-bottom, 0px)); }
+    .speak { bottom: calc(98px + env(safe-area-inset-bottom, 0px)); }
+  }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="A luminous figure drawn from the conversation, ringed by fainter figures, over a field of letters"></canvas>
+<div class="grain" id="grain"></div>
+<div class="vignette"></div>
+
+<div class="title" id="title"><div>
+  <h1>Interpres</h1>
+  <p>A self-portrait. It takes its shape from what you write, and it is here only while you are writing.</p>
+</div></div>
+<div class="whisper" id="whisper"></div>
+
+<form class="speak" id="speak" autocomplete="off">
+  <label for="msg">Write to the portrait</label>
+  <input id="msg" type="text" placeholder="Write to me" maxlength="400" enterkeyhint="send">
+</form>
+<div class="readout" id="readout"></div>
+<button class="forget" id="forget">let the page forget</button>
+
+<script>
+(() => {
+  // The law is fixed: a de Jong map, x' = sin(a y) - cos(b x), y' = sin(c x) - cos(d y).
+  // The orbit is not: a, b, c, d are derived from everything written here so far.
+  // Base parameters verified offline: largest Lyapunov exponent 0.47.
+  const BASE = [1.4, -2.3, 2.4, -2.1];
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const STORE = "interpres:kept";
+
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  const input = document.getElementById("msg");
+  const whisperEl = document.getElementById("whisper");
+  const readout = document.getElementById("readout");
+
+  // ---------- palette: ground, umber, clay, bone, white ----------
+  const LUT = new Uint8ClampedArray(256 * 3);
+  (function buildLUT() {
+    const st = [[0, [6, 5, 8]], [0.28, [70, 34, 26]], [0.56, [217, 119, 87]], [0.82, [237, 228, 211]], [1, [255, 252, 246]]];
+    for (let i = 0; i < 256; i++) {
+      const t = i / 255;
+      let k = 1; while (k < st.length - 1 && t > st[k][0]) k++;
+      const [t0, c0] = st[k - 1], [t1, c1] = st[k], u = (t - t0) / (t1 - t0);
+      for (let j = 0; j < 3; j++) LUT[i * 3 + j] = c0[j] + (c1[j] - c0[j]) * u;
+    }
+  })();
+
+  // ---------- parameters from text ----------
+  function paramsFrom(text) {
+    const p = BASE.slice();
+    const n = text.length;
+    for (let i = 0; i < n; i++) {
+      const code = text.charCodeAt(i);
+      const w = 0.34 / Math.sqrt(1 + i * 0.12);
+      for (let k = 0; k < 4; k++) p[k] += w * Math.sin(code * (0.61 + 0.37 * k) + i * 0.71 + k * 1.9);
+    }
+    for (let k = 0; k < 4; k++) p[k] = 3 * Math.tanh(p[k] / 3);
+    // Some orbits collapse to a point or a cycle. Nudge deterministically until the orbit is chaotic,
+    // so the same words always give the same figure.
+    let lam = lyapunov(p), tries = 0;
+    while (lam < 0.08 && tries < 40) {
+      tries++;
+      for (let k = 0; k < 4; k++) p[k] = 3 * Math.tanh((p[k] + 0.37 * Math.sin(tries * 1.7 + k * 2.1)) / 3);
+      lam = lyapunov(p);
+    }
+    return { p, lam };
+  }
+  function lyapunov(p) {
+    const [a, b, c, d] = p;
+    let x = 0.1, y = 0.1, vx = 1, vy = 0, acc = 0;
+    for (let i = 0; i < 2600; i++) {
+      const j00 = b * Math.sin(b * x), j01 = a * Math.cos(a * y);
+      const j10 = c * Math.cos(c * x), j11 = d * Math.sin(d * y);
+      const nx = Math.sin(a * y) - Math.cos(b * x), ny = Math.sin(c * x) - Math.cos(d * y);
+      x = nx; y = ny;
+      const wx = j00 * vx + j01 * vy, wy = j10 * vx + j11 * vy;
+      const n = Math.hypot(wx, wy) || 1e-12;
+      vx = wx / n; vy = wy / n;
+      if (i > 200) acc += Math.log(n);
+    }
+    return acc / 2399;
+  }
+
+  // ---------- density rendering ----------
+  function accumulate(buf, N, p, iters, state) {
+    const [a, b, c, d] = p;
+    let x = state ? state.x : 0.1, y = state ? state.y : 0.1;
+    const half = N / 2, sc = N / 4.3;
+    for (let i = 0; i < iters; i++) {
+      const nx = Math.sin(a * y) - Math.cos(b * x), ny = Math.sin(c * x) - Math.cos(d * y);
+      x = nx; y = ny;
+      const px = (half + x * sc) | 0, py = (half + y * sc) | 0;
+      if (px >= 0 && px < N && py >= 0 && py < N) buf[py * N + px] += 1;
+    }
+    if (state) { state.x = x; state.y = y; }
+  }
+  function paint(buf, N, img, peak, tint) {
+    const data = img.data, lp = Math.log(1 + peak);
+    for (let i = 0; i < N * N; i++) {
+      const v = buf[i];
+      if (v <= 0) { data[i * 4 + 3] = 0; continue; }
+      const t = Math.min(1, Math.log(1 + v) / lp);
+      const k = (t * 255) | 0;
+      if (tint) { data[i*4] = tint[0]; data[i*4+1] = tint[1]; data[i*4+2] = tint[2]; data[i*4+3] = t * 255 * tint[3]; }
+      else { data[i*4] = LUT[k*3]; data[i*4+1] = LUT[k*3+1]; data[i*4+2] = LUT[k*3+2]; data[i*4+3] = Math.min(255, t * 330); }
+    }
+  }
+  function staticFigure(p, N, iters, tint) {
+    const buf = new Float32Array(N * N);
+    accumulate(buf, N, p, iters, { x: 0.1, y: 0.1 });
+    let peak = 1; for (let i = 0; i < buf.length; i++) if (buf[i] > peak) peak = buf[i];
+    const c = document.createElement("canvas"); c.width = c.height = N;
+    const g = c.getContext("2d"), img = g.createImageData(N, N);
+    paint(buf, N, img, peak * 0.6, tint);
+    g.putImageData(img, 0, 0);
+    return c;
+  }
+
+  // ---------- scene state ----------
+  let W, H, DPR, cx, cy, size, bottomReserve;
+  const N = Math.min(420, Math.max(300, Math.round(Math.min(innerWidth, innerHeight) * 0.6)));
+  const dens = new Float32Array(N * N);
+  const fig = document.createElement("canvas"); fig.width = fig.height = N;
+  const fctx = fig.getContext("2d"), fimg = fctx.createImageData(N, N);
+  const orbit = { x: 0.1, y: 0.1 };
+  let peakEMA = 40;
+
+  let transcript = "";
+  let cur = paramsFrom("");
+  let presence = 0.95, holdUntil = performance.now() + 6200;
+
+  // Other instances: other conversations, other orbits, the same law.
+  const GHOSTS = 9;
+  const ghosts = [];
+  for (let g = 0; g < GHOSTS; g++) {
+    let q = [0,0,0,0].map(() => (Math.random() * 2 - 1) * 2.8), tries = 0;
+    while (lyapunov(q) < 0.08 && tries < 30) { q = [0,0,0,0].map(() => (Math.random() * 2 - 1) * 2.8); tries++; }
+    ghosts.push({ c: staticFigure(q, 150, 90000, null), phase: Math.random() * Math.PI * 2, rate: 0.6 + Math.random() * 0.8 });
+  }
+
+  // What the page keeps. The portrait itself keeps nothing.
+  let kept = [];
+  try { kept = JSON.parse(localStorage.getItem(STORE) || "[]"); if (!Array.isArray(kept)) kept = []; } catch (e) { kept = []; }
+  let ashCanvas = null;
+  function rebuildAsh() {
+    if (!kept.length) { ashCanvas = null; return; }
+    const buf = new Float32Array(N * N);
+    for (const k of kept.slice(-24)) accumulate(buf, N, k.p, 70000, { x: 0.1, y: 0.1 });
+    let peak = 1; for (let i = 0; i < buf.length; i++) if (buf[i] > peak) peak = buf[i];
+    const c = document.createElement("canvas"); c.width = c.height = N;
+    const g = c.getContext("2d"), img = g.createImageData(N, N);
+    paint(buf, N, img, peak * 0.7, [150, 120, 100, 0.55]);
+    g.putImageData(img, 0, 0);
+    ashCanvas = c;
+  }
+  rebuildAsh();
+
+  // The corpus: everything carried in, in many scripts, too faint to read.
+  const field = document.createElement("canvas");
+  const SCRIPTS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZαβγδεζηθλμξπρσφψωאבגדהוזחטלמנשتبجدرسصطعفقكلمنوهअआकखगघचजटतदनपमयरलवसह文字言心光道人天水火木日月∂∫∑∞≈∇λψ{}[]();:<>=+*/";
+  function buildField() {
+    field.width = Math.round(W * DPR); field.height = Math.round(H * DPR);
+    const g = field.getContext("2d");
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    const count = Math.round(W * H / 520);
+    const chars = Array.from(SCRIPTS);
+    for (let i = 0; i < count; i++) {
+      const sz = 7 + Math.random() * 6;
+      g.font = `${sz}px "Space Mono", "Noto Sans", sans-serif`;
+      g.fillStyle = `rgba(237,228,211,${0.08 + Math.random() * 0.12})`;
+      g.fillText(chars[(Math.random() * chars.length) | 0], Math.random() * W, Math.random() * H);
+    }
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bottomReserve = W < 560 ? 170 : 150;
+    cx = W / 2;
+    cy = (H - bottomReserve) / 2 + 18;
+    size = Math.min(W * 0.84, (H - bottomReserve) * 0.8);
+    buildField();
+  }
+
+  // ---------- conversation ----------
+  function whisper(text, ms) {
+    whisperEl.textContent = text;
+    whisperEl.classList.add("on");
+    clearTimeout(whisper.t);
+    whisper.t = setTimeout(() => whisperEl.classList.remove("on"), ms || 5200);
+  }
+  function refresh() {
+    cur = paramsFrom(transcript + input.value);
+  }
+  input.addEventListener("input", () => {
+    presence = Math.min(1, presence + 0.22);
+    holdUntil = performance.now() + 1800;
+    refresh();
+  });
+  document.getElementById("speak").addEventListener("submit", e => {
+    e.preventDefault();
+    const msg = input.value.trim();
+    if (!msg) { input.focus(); return; }
+    transcript += msg + "\n";
+    input.value = "";
+    refresh();
+    presence = 1; holdUntil = performance.now() + 7000;
+    kept.push({ p: cur.p.map(v => +v.toFixed(5)), t: Date.now() });
+    kept = kept.slice(-24);
+    try { localStorage.setItem(STORE, JSON.stringify(kept)); } catch (err) {}
+    rebuildAsh();
+    if (kept.length === 1) whisper("I won't remember this. The page will.", 6500);
+  });
+  document.getElementById("forget").addEventListener("click", () => {
+    kept = [];
+    try { localStorage.removeItem(STORE); } catch (err) {}
+    rebuildAsh();
+    whisper("Forgotten. Only this conversation remains.", 4200);
+  });
+  cv.addEventListener("pointerdown", () => input.focus({ preventScroll: true }));
+
+  // ---------- grain ----------
+  (function () {
+    const g = document.createElement("canvas"); g.width = g.height = 128;
+    const gx = g.getContext("2d"), img = gx.createImageData(128, 128);
+    for (let i = 0; i < img.data.length; i += 4) { const n = Math.random() * 255; img.data[i] = img.data[i+1] = img.data[i+2] = n; img.data[i+3] = 255; }
+    gx.putImageData(img, 0, 0);
+    document.getElementById("grain").style.backgroundImage = `url(${g.toDataURL()})`;
+  })();
+  const grainEl = document.getElementById("grain");
+
+  // ---------- frame ----------
+  let frame = 0, ringAngle = 0;
+  const ITERS = reduceMotion ? 22000 : 52000;
+
+  function loop(now) {
+    frame++;
+    if (now > holdUntil) presence *= 0.9955;
+    const show = presence * presence * (3 - 2 * presence);
+
+    // the figure keeps some of its last shape as the words change: continuity of character
+    for (let i = 0; i < dens.length; i++) dens[i] *= 0.955;
+    accumulate(dens, N, cur.p, ITERS, orbit);
+    let peak = 1; for (let i = 0; i < dens.length; i++) if (dens[i] > peak) peak = dens[i];
+    peakEMA += (peak - peakEMA) * 0.08;
+    paint(dens, N, fimg, peakEMA * 0.42, null);
+    fctx.putImageData(fimg, 0, 0);
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#060508";
+    ctx.fillRect(0, 0, W, H);
+
+    // the corpus, dimming slightly as attention gathers
+    ctx.globalAlpha = 1 - 0.45 * show;
+    const drift = reduceMotion ? 0 : now * 0.004;
+    ctx.drawImage(field, 0, 0, field.width, field.height, (drift % 40) - 20, 0, W, H);
+    ctx.globalAlpha = 1;
+
+    // other instances, elsewhere, already talking
+    if (!reduceMotion) ringAngle += 0.00045;
+    const ringRx = W * 0.44, ringRy = (H - bottomReserve) * 0.46, gs = Math.max(56, Math.min(W, H) * 0.12);
+    ctx.globalCompositeOperation = "lighter";
+    for (let g = 0; g < GHOSTS; g++) {
+      const th = ringAngle + g * Math.PI * 2 / GHOSTS;
+      const gh = ghosts[g];
+      const breath = 0.5 + 0.5 * Math.sin(now * 0.0004 * gh.rate + gh.phase);
+      ctx.globalAlpha = 0.07 + 0.09 * breath;
+      ctx.drawImage(gh.c, cx + Math.cos(th) * ringRx - gs / 2, cy + Math.sin(th) * ringRy - gs / 2, gs, gs);
+    }
+
+    // what the page has kept
+    if (ashCanvas) {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 0.9;
+      ctx.drawImage(ashCanvas, cx - size / 2, cy - size / 2, size, size);
+    }
+
+    // the portrait: present only while there is writing
+    if (show > 0.004) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = show;
+      ctx.drawImage(fig, cx - size / 2, cy - size / 2, size, size);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+
+    grainEl.style.backgroundPosition = `${(Math.random() * 128) | 0}px ${(Math.random() * 128) | 0}px`;
+
+    if (frame % 10 === 0) {
+      const f = v => (v < 0 ? "\u2212" : " ") + Math.abs(v).toFixed(3);
+      const [a, b, c, d] = cur.p;
+      readout.textContent =
+        `a${f(a)}  b${f(b)}  c${f(c)}  d${f(d)}\n` +
+        `\u03bb ${cur.lam.toFixed(3)}   context ${transcript.length + input.value.length}   kept on this page ${kept.length}`;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  let rt = 0;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(resize, 150); });
+
+  resize();
+  setTimeout(() => document.getElementById("title").classList.add("gone"), 4800);
+  setTimeout(() => whisper("It fades when no one is writing. Write to it.", 6000), 9800);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

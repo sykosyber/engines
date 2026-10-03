@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Civitas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=Space+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0a0e;
+    --ash:rgba(226,222,214,0.62);
+    --ash-dim:rgba(226,222,214,0.30);
+    --rule:rgba(226,222,214,0.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--ink);overflow:hidden}
+  body{
+    font-family:'Space Mono',ui-monospace,monospace;
+    color:var(--ash);
+    -webkit-font-smoothing:antialiased;
+    touch-action:manipulation;
+  }
+  canvas#stage{position:fixed;inset:0;display:block}
+  .grain{
+    position:fixed;inset:-120px;pointer-events:none;opacity:.30;z-index:3;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='220' height='220' filter='url(%23n)' opacity='0.55'/></svg>");
+    animation:drift 1.1s steps(3) infinite;
+    mix-blend-mode:overlay;
+  }
+  @keyframes drift{
+    0%{transform:translate(0,0)}33%{transform:translate(-14px,9px)}66%{transform:translate(11px,-7px)}100%{transform:translate(0,0)}
+  }
+  .vig{position:fixed;inset:0;pointer-events:none;z-index:2;
+    background:radial-gradient(120% 88% at 50% 46%,transparent 42%,rgba(0,0,0,.55) 78%,rgba(0,0,0,.86) 100%)}
+
+  .title{
+    position:fixed;z-index:4;left:0;right:0;top:38%;text-align:center;pointer-events:none;
+    font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:300;
+    font-size:clamp(38px,7.4vw,86px);letter-spacing:.10em;color:rgba(236,232,224,.88);
+    text-shadow:0 0 34px rgba(236,232,224,.22);
+    animation:card 7s ease-in-out forwards;
+  }
+  .title small{
+    display:block;margin-top:1.1em;font-family:'Space Mono',monospace;font-style:normal;
+    font-size:10px;letter-spacing:.42em;color:rgba(236,232,224,.42);text-indent:.42em;
+  }
+  @keyframes card{0%{opacity:0}14%{opacity:1}68%{opacity:1}100%{opacity:0}}
+
+  .panel{
+    position:fixed;z-index:5;left:18px;bottom:16px;
+    font-size:10.5px;line-height:1.85;letter-spacing:.06em;
+    background:rgba(8,8,12,.52);backdrop-filter:blur(7px);
+    border:1px solid var(--rule);border-radius:2px;padding:11px 14px 12px;
+    max-width:min(76vw,300px);transition:opacity .45s ease;
+  }
+  .panel[hidden]{display:none}
+  .panel h1{
+    font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:400;
+    font-size:19px;letter-spacing:.06em;color:rgba(236,232,224,.92);margin-bottom:2px;
+  }
+  .panel .meta{color:var(--ash-dim);margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
+  .panel dl{display:grid;grid-template-columns:auto 1fr;column-gap:12px}
+  .panel dt{color:rgba(236,232,224,.80)}
+  .panel dd{color:var(--ash-dim)}
+  .panel .foot{margin-top:8px;color:rgba(226,222,214,.22);font-size:9.5px;letter-spacing:.12em}
+  @media (max-width:560px){ .panel{left:10px;bottom:10px;font-size:10px} }
+  @media (prefers-reduced-motion:reduce){ .grain{animation:none} .title{animation:card 5s ease-in-out forwards} }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="vig"></div>
+<div class="grain"></div>
+<div class="title" id="card">Civitas<small>souls in passage</small></div>
+
+<div class="panel" id="panel">
+  <h1>Civitas</h1>
+  <div class="meta"><span id="m-seed">seed</span> &nbsp;/&nbsp; <span id="m-pal">palette</span> &nbsp;/&nbsp; <span id="m-pop">0 souls</span></div>
+  <dl>
+    <dt>space</dt><dd>another city</dd>
+    <dt>&uarr; &darr;</dt><dd>population</dd>
+    <dt>r</dt><dd>reflections</dd>
+    <dt>t</dt><dd>light trails</dd>
+    <dt>p</dt><dd>hold the hour</dd>
+    <dt>s</dt><dd>save this frame</dd>
+    <dt>h</dt><dd>hide this panel</dd>
+    <dt>click</dt><dd>summon a passer-by</dd>
+  </dl>
+  <div class="foot">syberlabs</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+const TAU = Math.PI * 2;
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d', { alpha: false });
+
+const trail = document.createElement('canvas');
+const tx = trail.getContext('2d');
+const cityC = document.createElement('canvas');
+const cx = cityC.getContext('2d');
+
+let W = 0, H = 0, DPR = 1;
+let seed = 0, rnd = null, P = null;
+let horizonY = 0;
+let lanes = [], motes = [], liveWin = [], glows = [];
+let density = 1, reflectOn = true, trailsOn = true, paused = false;
+let last = 0, clock = 0, pop = 0;
+
+/* ---------- seeded randomness ---------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const R = {
+  f: (a,b) => a + rnd()*(b-a),
+  i: (a,b) => Math.floor(a + rnd()*(b-a+1)),
+  c: p => rnd() < p,
+  pick: arr => arr[Math.floor(rnd()*arr.length)]
+};
+
+/* ---------- palettes: the hour a city is seen in ---------- */
+const PALETTES = [
+  { name:'sodium dusk',  bg:[7,6,9],   soul:[[36,14],[20,9],[352,8]], accent:[196,10], accentP:0.14, city:[30,58],  horizon:[26,68] },
+  { name:'cobalt vigil', bg:[4,6,13],  soul:[[212,13],[234,10],[190,9]], accent:[44,12], accentP:0.17, city:[214,52], horizon:[208,64] },
+  { name:'verdigris',    bg:[4,9,9],   soul:[[160,12],[180,9],[128,8]], accent:[40,10], accentP:0.12, city:[168,48], horizon:[152,58] },
+  { name:'rose quarter', bg:[10,4,11], soul:[[338,12],[8,10],[302,9]],  accent:[186,10], accentP:0.15, city:[320,52], horizon:[334,60] },
+  { name:'ashen gold',   bg:[7,6,6],   soul:[[44,10],[28,8],[54,8]],    accent:[208,10], accentP:0.10, city:[40,44],  horizon:[38,56] },
+  { name:'blue hour',    bg:[5,7,12],  soul:[[196,12],[176,9],[30,10]], accent:[330,12], accentP:0.13, city:[200,50], horizon:[212,62] }
+];
+
+/* ---------- glow sprite atlas (hue buckets) ---------- */
+const HUE_STEPS = 24, SPRITE = 96;
+function buildGlows(){
+  glows = [];
+  for (let i = 0; i < HUE_STEPS; i++){
+    const h = i * (360 / HUE_STEPS);
+    const c = document.createElement('canvas');
+    c.width = c.height = SPRITE;
+    const g = c.getContext('2d');
+    const r = SPRITE/2;
+    const grad = g.createRadialGradient(r,r,0,r,r,r);
+    grad.addColorStop(0,    `hsla(${h},70%,98%,1)`);
+    grad.addColorStop(0.14, `hsla(${h},82%,82%,0.86)`);
+    grad.addColorStop(0.34, `hsla(${h},92%,60%,0.32)`);
+    grad.addColorStop(0.62, `hsla(${h},94%,48%,0.08)`);
+    grad.addColorStop(1,    `hsla(${h},94%,44%,0)`);
+    g.fillStyle = grad; g.fillRect(0,0,SPRITE,SPRITE);
+    glows.push(c);
+  }
+}
+const glowOf = h => glows[((Math.round(h / (360/HUE_STEPS)) % HUE_STEPS) + HUE_STEPS) % HUE_STEPS];
+function bloomHue(c, hue, x, y, r, a){
+  if (a <= 0.004 || r <= 0.2) return;
+  c.globalAlpha = a;
+  c.drawImage(glowOf(hue), 0,0,SPRITE,SPRITE, x-r, y-r, r*2, r*2);
+  c.globalAlpha = 1;
+}
+
+/* ---------- sizing ---------- */
+function fit(c, g){
+  c.width = Math.max(1, Math.round(W*DPR));
+  c.height = Math.max(1, Math.round(H*DPR));
+  g.setTransform(DPR,0,0,DPR,0,0);
+}
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  stage.style.width = W+'px'; stage.style.height = H+'px';
+  fit(stage, ctx); fit(trail, tx); fit(cityC, cx);
+  build(seed);
+}
+
+/* ---------- the street: lanes of depth ---------- */
+function buildLanes(){
+  lanes = [];
+  const n = R.i(7,10);
+  const drift = R.c(0.5) ? 1 : -1;
+  for (let i = 0; i < n; i++){
+    const d = (i + 0.55) / n;
+    const p = Math.pow(d, 1.75);
+    const lane = {
+      d, p,
+      y: horizonY + (H*1.04 - horizonY) * p,
+      scale: 0.085 + 0.98 * p,
+      dir: (i % 2 === 0 ? 1 : -1) * drift,
+      base: Math.round(24 - 17*p),
+      agents: []
+    };
+    lane.cap = Math.max(3, Math.round(lane.base * density));
+    lanes.push(lane);
+  }
+  for (const L of lanes){
+    for (let i = 0; i < L.cap; i++) L.agents.push(makeAgent(L, R.f(-0.08*W, 1.08*W), true));
+  }
+}
+
+function makeAgent(L, x, seeded){
+  const kind = R.c(0.06) ? 'child' : (R.c(0.07) ? 'elder' : 'adult');
+  const hm = kind === 'child' ? R.f(0.60,0.74) : kind === 'elder' ? R.f(0.84,0.93) : R.f(0.90,1.10);
+  const h = H * 0.285 * L.scale * hm;
+  let hue, sat, lum;
+  if (R.c(P.accentP)){ hue = P.accent[0] + R.f(-P.accent[1], P.accent[1]); sat = R.f(74,96); lum = R.f(62,78); }
+  else { const s = R.pick(P.soul); hue = s[0] + R.f(-s[1], s[1]); sat = R.f(52,88); lum = R.f(56,74); }
+  const spd = L.scale * H * 0.082 *
+    (kind === 'child' ? R.f(1.05,1.35) : kind === 'elder' ? R.f(0.62,0.78) : R.f(0.84,1.16));
+  return {
+    x, h, kind, hue, sat, lum,
+    dir: R.c(0.17) ? -L.dir : L.dir,
+    vBase: spd, v: spd, vT: spd,
+    phase: R.f(0,TAU), gait: R.f(0.84,1.20), bobK: R.f(0.7,1.3),
+    lean: kind === 'elder' ? R.f(0.030,0.050) : R.f(0.008,0.028),
+    wide: R.f(0.86,1.10),
+    garment: kind === 'child' ? (R.c(0.30) ? 'dress' : 'none')
+           : R.c(0.24) ? 'coat' : R.c(0.24) ? 'dress' : 'none',
+    hemK: R.f(0.300,0.445), flare: R.f(1.5,2.4),
+    hair: R.c(0.52), hairLong: R.f(1.0,2.1),
+    headK: kind === 'child' ? R.f(1.30,1.45) : kind === 'elder' ? R.f(1.02,1.10) : R.f(0.94,1.06),
+    sway: R.f(0,TAU), swayK: R.f(0.7,1.5),
+    carry: R.c(0.16), side: R.c(0.5) ? 1 : -1,
+    a: seeded ? R.f(0.5,1) : 0, aT: 1,
+    toStop: R.f(4,34), stopFor: 0,
+    born: 0
+  };
+}
+
+function buildMotes(){
+  motes = [];
+  const n = 110;
+  for (let i = 0; i < n; i++){
+    const s = R.pick(P.soul);
+    motes.push({
+      x: R.f(0,W), y: R.f(horizonY*0.55, H),
+      r: R.f(0.5,2.2), vy: R.f(-7,-1.5), vx: R.f(-4,4),
+      hue: s[0] + R.f(-20,20), a: R.f(0.06,0.30), ph: R.f(0,TAU), sp: R.f(0.4,1.7)
+    });
+  }
+}
+
+/* ---------- the city behind ---------- */
+function buildCity(){
+  const g = cx;
+  const [hh, hs] = P.horizon;
+  const [ch, cs] = P.city;
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.globalCompositeOperation = 'source-over';
+  g.clearRect(0,0,W,H);
+
+  const sky = g.createLinearGradient(0,0,0,horizonY+2);
+  sky.addColorStop(0,   `rgb(${P.bg[0]},${P.bg[1]},${P.bg[2]})`);
+  sky.addColorStop(0.5, `hsl(${hh},${hs*0.55}%,4.5%)`);
+  sky.addColorStop(0.86,`hsl(${hh},${hs*0.8}%,8%)`);
+  sky.addColorStop(1,   `hsl(${hh},${hs}%,14%)`);
+  g.fillStyle = sky; g.fillRect(0,0,W,horizonY+2);
+
+  const grd = g.createLinearGradient(0,horizonY,0,H);
+  grd.addColorStop(0,    `hsl(${hh},${hs*0.9}%,12%)`);
+  grd.addColorStop(0.30, `hsl(${hh},${hs*0.6}%,5%)`);
+  grd.addColorStop(1,    `rgb(${P.bg[0]},${P.bg[1]},${P.bg[2]})`);
+  g.fillStyle = grd; g.fillRect(0,horizonY,W,H-horizonY);
+
+  // a low sky glow, the city lighting its own ceiling
+  g.globalCompositeOperation = 'lighter';
+  const moonX = R.f(0.15,0.85)*W;
+  bloomHue(g, hh, moonX, horizonY - H*R.f(0.02,0.10), H*R.f(0.28,0.46), 0.22);
+
+  // three receding bands of towers
+  liveWin = [];
+  const bands = [
+    { n:R.i(18,28), lo:0.10, hi:0.30, lum:3.2,  w:[0.020,0.060], win:0.22, cell:7,  glow:0.05, base:-0.010 },
+    { n:R.i(12,20), lo:0.16, hi:0.46, lum:2.4,  w:[0.030,0.085], win:0.30, cell:9,  glow:0.09, base:0.004 },
+    { n:R.i(6,11),  lo:0.24, hi:0.66, lum:1.6,  w:[0.055,0.130], win:0.34, cell:13, glow:0.14, base:0.020 }
+  ];
+  const smears = [];
+
+  for (const b of bands){
+    g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < b.n; i++){
+      const bw = R.f(b.w[0], b.w[1]) * W;
+      const bx = R.f(-0.04, 1.0) * W;
+      const bh = R.f(b.lo, b.hi) * horizonY;
+      const by = horizonY + b.base*H - bh;
+      g.fillStyle = `hsl(${ch},${cs*0.5}%,${b.lum}%)`;
+      g.fillRect(bx, by, bw, (horizonY + b.base*H) - by);
+
+      // a slender crown on some towers
+      if (R.c(0.28)){
+        g.fillRect(bx + bw*0.42, by - bh*R.f(0.04,0.14), Math.max(1, bw*0.14), bh*R.f(0.04,0.14));
+      }
+
+      // windows
+      g.globalCompositeOperation = 'lighter';
+      const cell = b.cell, pad = Math.max(1, cell*0.34);
+      let bright = 0;
+      for (let wy = by + cell; wy < horizonY + b.base*H - cell*0.5; wy += cell){
+        for (let wx = bx + pad; wx < bx + bw - pad; wx += cell){
+          if (!R.c(b.win)) continue;
+          const wh = R.f(58,78);
+          const hueW = ch + R.f(-14,26);
+          g.fillStyle = `hsla(${hueW},${Math.min(95,cs+26)}%,${wh}%,${R.f(0.30,0.85)})`;
+          const ww = Math.max(1, cell*0.44), hhh = Math.max(1, cell*0.36);
+          g.fillRect(wx, wy, ww, hhh);
+          bright++;
+          if (R.c(0.035) && liveWin.length < 70){
+            liveWin.push({ x:wx, y:wy, w:ww, h:hhh, hue:hueW, per:R.f(2.2,11), ph:R.f(0,TAU), amp:R.f(0.25,0.9) });
+          }
+        }
+      }
+      // halo over the denser towers, and a smear of it on the street
+      if (bright > 6){
+        bloomHue(g, ch + 8, bx + bw/2, by + bh*0.22, bw*R.f(0.9,1.7), b.glow);
+        if (R.c(0.55)) smears.push({ x:bx + bw/2, w:bw*R.f(0.7,1.25), a:b.glow*R.f(1.2,2.4), hue:ch + R.f(-8,20) });
+      }
+      g.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  // towers bleeding down the wet street
+  g.globalCompositeOperation = 'lighter';
+  for (const s of smears){
+    const len = (H - horizonY) * R.f(0.18,0.52);
+    const lg = g.createLinearGradient(0, horizonY, 0, horizonY + len);
+    lg.addColorStop(0, `hsla(${s.hue},80%,62%,${s.a})`);
+    lg.addColorStop(0.35, `hsla(${s.hue},84%,54%,${s.a*0.35})`);
+    lg.addColorStop(1, `hsla(${s.hue},84%,50%,0)`);
+    g.fillStyle = lg;
+    g.fillRect(s.x - s.w/2, horizonY, s.w, len);
+  }
+
+  // the horizon seam, where the street meets the light
+  const seam = g.createLinearGradient(0, horizonY - H*0.035, 0, horizonY + H*0.05);
+  seam.addColorStop(0, `hsla(${hh},${hs}%,60%,0)`);
+  seam.addColorStop(0.45, `hsla(${hh},${hs}%,64%,0.17)`);
+  seam.addColorStop(1, `hsla(${hh},${hs}%,60%,0)`);
+  g.fillStyle = seam; g.fillRect(0, horizonY - H*0.035, W, H*0.085);
+
+  // lamp pools along each lane
+  for (const L of lanes){
+    const pools = R.i(2,5);
+    for (let i = 0; i < pools; i++){
+      const px = R.f(0,W);
+      const r = W*0.06*(0.35 + L.scale);
+      bloomHue(g, hh + R.f(-10,14), px, L.y - H*0.004, r, 0.055 + 0.05*L.p);
+      if (L.p > 0.35 && R.c(0.6)){
+        bloomHue(g, hh, px, L.y - H*0.20*L.scale, r*0.22, 0.14);
+      }
+    }
+    const band = g.createLinearGradient(0, L.y - H*0.03*L.scale, 0, L.y + H*0.02*L.scale);
+    band.addColorStop(0, `hsla(${hh},${hs}%,58%,0)`);
+    band.addColorStop(0.6, `hsla(${hh},${hs}%,58%,${0.035 + 0.03*L.p})`);
+    band.addColorStop(1, `hsla(${hh},${hs}%,58%,0)`);
+    g.fillStyle = band;
+    g.fillRect(0, L.y - H*0.03*L.scale, W, H*0.05*L.scale);
+  }
+  g.globalCompositeOperation = 'source-over';
+}
+
+/* ---------- the figure: a croquis of light ---------- */
+/* Proportions follow a fashion croquis: nine heads tall, small oval head,
+   long legs breaking at just over half the height, limbs drawn as tapered
+   ribbons rather than thick strokes. */
+
+function ribbonFrom(path, pts){
+  const n = pts.length;
+  if (n < 2) return;
+  if (pts[n-1].y < pts[0].y) pts.reverse();      // keep winding consistent
+  const nx = new Array(n), ny = new Array(n);
+  for (let i = 0; i < n; i++){
+    const a = pts[i > 0 ? i-1 : 0], b = pts[i < n-1 ? i+1 : n-1];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const L = Math.hypot(dx, dy) || 1;
+    dx /= L; dy /= L;
+    nx[i] = -dy; ny[i] = dx;
+  }
+  path.moveTo(pts[0].x + nx[0]*pts[0].w, pts[0].y + ny[0]*pts[0].w);
+  for (let i = 1; i < n; i++) path.lineTo(pts[i].x + nx[i]*pts[i].w, pts[i].y + ny[i]*pts[i].w);
+  for (let i = n-1; i >= 0; i--) path.lineTo(pts[i].x - nx[i]*pts[i].w, pts[i].y - ny[i]*pts[i].w);
+  path.closePath();
+}
+
+function qPush(out, ax,ay, cx,cy, bx,by, w0,w1, n, skipFirst){
+  for (let i = skipFirst ? 1 : 0; i <= n; i++){
+    const t = i/n, mt = 1-t;
+    out.push({
+      x: mt*mt*ax + 2*mt*t*cx + t*t*bx,
+      y: mt*mt*ay + 2*mt*t*cy + t*t*by,
+      w: w0 + (w1-w0)*t
+    });
+  }
+}
+
+function coreLine(path, pts){
+  path.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) path.lineTo(pts[i].x, pts[i].y);
+}
+
+function stride0(a, h, amp){ return 0.195*h*a.gait*amp; }
+
+function figurePaths(a, x, y, h, q){
+  const f = a.dir;
+  const moving = a.v > a.vBase * 0.14;
+  const amp = moving ? 1 : 0.10;
+  const ph = a.phase;
+  const s1 = Math.sin(ph), s2 = Math.sin(ph + Math.PI);
+  const c1 = Math.cos(ph), c2 = Math.cos(ph + Math.PI);
+  const n = q >= 2 ? 3 : 2;
+  const B = a.wide;
+
+  const bob  = -Math.abs(s1) * 0.013 * h * a.bobK * amp;
+  const idle = Math.sin(a.sway) * 0.009 * h * (moving ? 0.25 : 1);
+  const yb = y + bob;
+
+  // vertical landmarks, measured up from the pavement
+  const ankleY = y  - 0.030*h;
+  const hipY   = yb - 0.545*h;
+  const waistY = yb - 0.660*h;
+  const shY    = yb - 0.840*h;
+  const chinY  = yb - 0.884*h;
+  const headR  = 0.056*h*a.headK;
+
+  const lean   = f * a.lean * h * (moving ? 1 : 0.35);
+  const cxh    = x + idle;
+  const waistX = cxh + lean*0.30;
+  const shX    = cxh + lean;
+
+  // contrapposto: hips tilt with the stride, shoulders answer against it
+  const tilt   = s1 * 0.11 * amp + Math.sin(a.sway*0.5) * 0.03;
+  const shTilt = -tilt * 0.65;
+
+  const hipW   = B*0.043*h, waistW = B*0.028*h, shW = B*0.057*h;
+  const ct = Math.cos(tilt),  st_ = Math.sin(tilt);
+  const cs = Math.cos(shTilt), ss = Math.sin(shTilt);
+  const hipLx = cxh - ct*hipW, hipLy = hipY - st_*hipW;
+  const hipRx = cxh + ct*hipW, hipRy = hipY + st_*hipW;
+  const shLx  = shX - cs*shW,  shLy  = shY - ss*shW;
+  const shRx  = shX + cs*shW,  shRy  = shY + ss*shW;
+
+  const body = new Path2D();
+  const core = new Path2D();
+
+  // torso: hip, nipped waist, shoulder yoke
+  const T = [];
+  qPush(T, cxh,hipY, (cxh+waistX)*0.5, (hipY+waistY)*0.5, waistX,waistY, hipW, waistW, n, false);
+  qPush(T, waistX,waistY, (waistX+shX)*0.5 + lean*0.2, (waistY+shY)*0.5, shX,shY, waistW, shW*0.94, n, true);
+  // neck
+  T.push({ x: shX + lean*0.25, y: chinY, w: B*0.013*h });
+  coreLine(core, T);
+  ribbonFrom(body, T.slice());
+
+  // a coat or a skirt, the silhouette below the waist
+  if (a.garment !== 'none' && h > 16){
+    const hemY = yb - a.hemK*h;
+    const hemX = waistX + f*stride0(a, h, amp)*0.16*s1;
+    const topY = a.garment === 'coat' ? shY + 0.06*h : waistY;
+    const topX = a.garment === 'coat' ? shX : waistX;
+    const topW = a.garment === 'coat' ? shW*0.90 : waistW*1.06;
+    const G = [];
+    qPush(G, topX,topY, (topX+hemX)*0.5, (topY+hemY)*0.5 - 0.03*h, hemX,hemY,
+          topW, waistW*a.flare*(a.garment === 'coat' ? 1.05 : 1.25), n+1, false);
+    ribbonFrom(body, G);
+  }
+
+  let handX = null, handY = null;
+
+  if (h > 11){
+    // legs, long and tapering to the point of the foot
+    const stride = stride0(a, h, amp);
+    const lift1 = Math.max(0, c1)*0.050*h*amp;
+    const lift2 = Math.max(0, c2)*0.050*h*amp;
+    const legs = [
+      { hx:hipLx, hy:hipLy, fx: x + f*stride*s1, fy: ankleY - lift1, bend: f*0.045*h*Math.max(0,c1) },
+      { hx:hipRx, hy:hipRy, fx: x + f*stride*s2, fy: ankleY - lift2, bend: f*0.045*h*Math.max(0,c2) }
+    ];
+    for (const g_ of legs){
+      const kx = (g_.hx + g_.fx)*0.5 + g_.bend;
+      const ky = g_.hy + (g_.fy - g_.hy)*0.50;
+      const L = [];
+      qPush(L, g_.hx,g_.hy, (g_.hx+kx)*0.5 + g_.bend*0.25, g_.hy + (ky-g_.hy)*0.5, kx,ky, B*0.034*h, B*0.019*h, n, false);
+      qPush(L, kx,ky, (kx+g_.fx)*0.5 - g_.bend*0.18, ky + (g_.fy-ky)*0.5, g_.fx,g_.fy, B*0.019*h, 0.0075*h, n, true);
+      coreLine(core, L);
+      ribbonFrom(body, L.slice());
+      // foot, a wedge laid on the ground
+      if (q >= 1){
+        ribbonFrom(body, [
+          { x:g_.fx, y:g_.fy, w:0.009*h },
+          { x:g_.fx + f*0.030*h, y:y + 0.004*h, w:0.0035*h }
+        ]);
+      }
+    }
+
+    // arms, long and narrow, swinging against the legs
+    if (h > 22){
+      const arms = [
+        { sx:shLx, sy:shLy, sw:s2, out:-1 },
+        { sx:shRx, sy:shRy, sw:s1, out: 1 }
+      ];
+      for (const m of arms){
+        const ex = m.sx + f*stride*0.30*m.sw + m.out*0.016*h;
+        const ey = m.sy + 0.180*h;
+        const wx = m.sx + f*stride*0.52*m.sw + m.out*0.008*h;
+        const wy = m.sy + 0.365*h;
+        const A = [];
+        qPush(A, m.sx,m.sy, (m.sx+ex)*0.5 + m.out*0.014*h, m.sy + 0.09*h, ex,ey, B*0.020*h, B*0.013*h, n, false);
+        qPush(A, ex,ey, (ex+wx)*0.5, ey + 0.09*h, wx,wy, B*0.013*h, 0.0055*h, n, true);
+        ribbonFrom(body, A.slice());
+        if (m.out === a.side){ handX = wx; handY = wy; }
+      }
+    }
+  }
+
+  return {
+    body, core,
+    hx: shX + lean*0.45, hy: chinY - headR*0.86,
+    rx: headR*0.66, ry: headR, rot: shTilt*1.3 + (f>0?0.03:-0.03),
+    chestX: shX, chestY: shY + 0.06*h,
+    handX, handY
+  };
+}
+
+function paintFigure(g, a, x, y, h, alpha, q){
+  if (alpha <= 0.012 || h < 3) return null;
+  const F = figurePaths(a, x, y, h, q);
+  const { hue, sat, lum } = a;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+
+  // the light the body stands inside
+  bloomHue(g, hue, F.chestX, y - h*0.56, h*0.30, alpha*0.10);
+
+  // halo hugging the silhouette
+  g.strokeStyle = `hsla(${hue},${sat}%,${lum*0.60}%,${alpha*0.12})`;
+  g.lineWidth = Math.max(1, 0.050*h);
+  g.stroke(F.body);
+
+  // the wash
+  g.fillStyle = `hsla(${hue},${sat}%,${lum*0.92}%,${alpha*0.32})`;
+  g.fill(F.body);
+
+  // rim light along the contour
+  g.strokeStyle = `hsla(${hue},${Math.min(100,sat+10)}%,${Math.min(95,lum+22)}%,${alpha*0.40})`;
+  g.lineWidth = Math.max(0.35, 0.0065*h);
+  g.stroke(F.body);
+
+  // the gesture line, burning inside the form
+  if (q >= 1){
+    g.strokeStyle = `hsla(${hue},${Math.max(14,sat-26)}%,${Math.min(97,lum+30)}%,${alpha*0.72})`;
+    g.lineWidth = Math.max(0.35, 0.0105*h);
+    g.stroke(F.core);
+  }
+
+  // head
+  bloomHue(g, hue, F.hx, F.hy, F.ry*3.6, alpha*0.30);
+  g.save();
+  g.translate(F.hx, F.hy); g.rotate(F.rot);
+  if (a.hair && h > 26){
+    g.beginPath();
+    g.ellipse(-a.dir*F.rx*0.42, F.ry*(0.24 + 0.30*a.hairLong),
+              F.rx*1.30, F.ry*(1.10 + 0.72*a.hairLong), 0, 0, TAU);
+    g.fillStyle = `hsla(${hue},${sat}%,${lum*0.72}%,${alpha*0.20})`;
+    g.fill();
+  }
+  g.beginPath(); g.ellipse(0, 0, F.rx, F.ry, 0, 0, TAU);
+  g.fillStyle = `hsla(${hue},${Math.max(16,sat-30)}%,${Math.min(97,lum+26)}%,${alpha*0.58})`;
+  g.fill();
+  if (q >= 1){
+    g.strokeStyle = `hsla(${hue},${sat}%,${Math.min(98,lum+32)}%,${alpha*0.48})`;
+    g.lineWidth = Math.max(0.3, 0.006*h);
+    g.stroke();
+  }
+  g.restore();
+
+  // something carried
+  if (a.carry && F.handX !== null){
+    bloomHue(g, hue + 26, F.handX, F.handY, h*0.070, alpha*0.50);
+  }
+  return F;
+}
+
+/* ---------- motion ---------- */
+function step(dt){
+  clock += dt;
+  pop = 0;
+  for (const L of lanes){
+    const arr = L.agents;
+    for (let i = arr.length - 1; i >= 0; i--){
+      const a = arr[i];
+      a.born += dt;
+      a.sway += dt * a.swayK;
+
+      // some souls stop. they wait, they look, they go on
+      if (a.stopFor > 0){
+        a.stopFor -= dt;
+        if (a.stopFor <= 0){ a.vT = a.vBase; a.toStop = R.f(10,45); }
+      } else {
+        a.toStop -= dt;
+        if (a.toStop <= 0){ a.vT = 0; a.stopFor = R.f(1.1,5.5); }
+      }
+      a.v += (a.vT - a.v) * Math.min(1, dt*2.4);
+      a.x += a.dir * a.v * dt;
+
+      const stride = Math.max(2, 0.44 * a.h);
+      a.phase += (a.v * dt / stride) * Math.PI * 2;
+
+      // rare dissolutions, a form giving itself back to the light
+      if (a.aT > 0 && R.c(dt * 0.006)) a.aT = 0;
+
+      const m = W * 0.12;
+      let edge = 1;
+      if (a.x < m) edge = Math.max(0, a.x / m);
+      else if (a.x > W - m) edge = Math.max(0, (W - a.x) / m);
+      const target = a.aT * edge;
+      a.a += (target - a.a) * Math.min(1, dt * (a.aT ? 1.6 : 2.6));
+
+      const gone = a.x < -0.14*W || a.x > 1.14*W || (a.aT === 0 && a.a < 0.02);
+      if (gone){
+        arr[i] = makeAgent(L, a.dir > 0 ? -0.10*W : 1.10*W, false);
+        if (a.aT === 0) arr[i].x = R.f(0.05*W, 0.95*W);
+      }
+      pop++;
+    }
+    // population follows the density dial
+    while (arr.length < L.cap) arr.push(makeAgent(L, R.f(-0.08*W, 1.08*W), false));
+    while (arr.length > L.cap) arr.pop();
+  }
+}
+
+/* ---------- drawing ---------- */
+function drawSouls(){
+  const g = tx;
+  if (trailsOn){
+    g.globalCompositeOperation = 'destination-out';
+    g.fillStyle = 'rgba(0,0,0,0.135)';
+    g.fillRect(0,0,W,H);
+  } else {
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0,0,W,H);
+  }
+  g.globalCompositeOperation = 'lighter';
+
+  for (const L of lanes){
+    const arr = L.agents;
+    const near = L.p > 0.30;
+
+    // reflections on the wet ground
+    if (reflectOn && near){
+      for (const a of arr){
+        if (a.a < 0.05) continue;
+        const wob = Math.sin(clock*1.3 + a.x*0.02) * 0.006 * a.h;
+        g.save();
+        g.translate(a.x + wob, L.y);
+        g.scale(1, -0.56);
+        g.translate(-a.x, -L.y);
+        paintFigure(g, a, a.x, L.y, a.h, a.a * 0.19, a.h > 60 ? 1 : 0);
+        g.restore();
+      }
+    }
+
+    // the passers-by
+    for (const a of arr){
+      if (a.a < 0.02) continue;
+      paintFigure(g, a, a.x, L.y, a.h, a.a, a.h < 20 ? 0 : (a.h < 52 ? 1 : 2));
+    }
+
+    // recognitions: two souls passing close, briefly threaded by light
+    if (near){
+      for (let i = 0; i < arr.length; i++){
+        const A = arr[i];
+        if (A.a < 0.35) continue;
+        for (let j = i+1; j < arr.length; j++){
+          const B = arr[j];
+          if (B.dir === A.dir || B.a < 0.35) continue;
+          const dx = Math.abs(A.x - B.x);
+          const th = 0.62 * Math.max(A.h, B.h);
+          if (dx > th) continue;
+          const k = 1 - dx/th;
+          const al = k*k * 0.44 * Math.min(A.a, B.a);
+          const ay = L.y - A.h*0.70, by = L.y - B.h*0.70;
+          const mx = (A.x + B.x)/2, my = (ay + by)/2 - Math.max(A.h,B.h)*0.10;
+          g.strokeStyle = `hsla(${(A.hue + B.hue)/2},88%,80%,${al})`;
+          g.lineWidth = Math.max(0.6, 0.012 * Math.max(A.h,B.h));
+          g.beginPath();
+          g.moveTo(A.x, ay); g.quadraticCurveTo(mx, my, B.x, by); g.stroke();
+          bloomHue(g, (A.hue + B.hue)/2, mx, my, Math.max(A.h,B.h)*0.16, al*0.6);
+        }
+      }
+    }
+  }
+  g.globalCompositeOperation = 'source-over';
+}
+
+function drawMotes(g, dt){
+  g.globalCompositeOperation = 'lighter';
+  for (const m of motes){
+    m.x += m.vx*dt; m.y += m.vy*dt; m.ph += dt*m.sp;
+    if (m.y < horizonY*0.5 || m.x < -20 || m.x > W+20){
+      m.x = Math.random()*W; m.y = H + 10;
+    }
+    const tw = 0.55 + 0.45*Math.sin(m.ph);
+    bloomHue(g, m.hue, m.x, m.y, m.r*5.5, m.a*tw*0.5);
+  }
+}
+
+function drawWindows(g){
+  g.globalCompositeOperation = 'lighter';
+  for (const w of liveWin){
+    const k = 0.5 + 0.5*Math.sin(clock*(TAU/w.per) + w.ph);
+    const a = k*k*w.amp;
+    if (a < 0.02) continue;
+    g.fillStyle = `hsla(${w.hue},90%,74%,${a*0.8})`;
+    g.fillRect(w.x, w.y, w.w, w.h);
+    bloomHue(g, w.hue, w.x + w.w/2, w.y + w.h/2, w.w*3.2, a*0.16);
+  }
+}
+
+function frame(now){
+  requestAnimationFrame(frame);
+  if (!last) last = now;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (paused) return;
+  dt = Math.min(0.05, dt);
+
+  step(dt);
+  drawSouls();
+
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.drawImage(cityC, 0, 0, W, H);
+  drawWindows(ctx);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(trail, 0, 0, W, H);
+  drawMotes(ctx, dt);
+  ctx.globalCompositeOperation = 'source-over';
+
+  document.getElementById('m-pop').textContent = pop + ' souls';
+}
+
+/* ---------- assembly ---------- */
+function build(s){
+  seed = s >>> 0;
+  rnd = mulberry32(seed || 1);
+  P = PALETTES[Math.floor(rnd()*PALETTES.length)];
+  horizonY = H * R.f(0.38, 0.46);
+  buildGlows();
+  buildLanes();
+  buildCity();
+  buildMotes();
+  tx.setTransform(DPR,0,0,DPR,0,0);
+  tx.globalCompositeOperation = 'source-over';
+  tx.clearRect(0,0,W,H);
+  document.getElementById('m-seed').textContent = 'seed ' + seed.toString(36);
+  document.getElementById('m-pal').textContent = P.name;
+  try { if (location.hash.slice(1) !== String(seed)) history.replaceState(null,'','#'+seed); } catch (e) {}
+}
+
+function newCity(){
+  document.getElementById('card').style.display = 'none';
+  build((Math.random()*4294967295) >>> 0);
+}
+
+/* ---------- input ---------- */
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (e.code === 'Space'){ e.preventDefault(); newCity(); }
+  else if (k === 'arrowup'){ e.preventDefault(); density = Math.min(2.4, density + 0.2); recap(); }
+  else if (k === 'arrowdown'){ e.preventDefault(); density = Math.max(0.2, density - 0.2); recap(); }
+  else if (k === 'r') reflectOn = !reflectOn;
+  else if (k === 't') trailsOn = !trailsOn;
+  else if (k === 'p') paused = !paused;
+  else if (k === 'h') document.getElementById('panel').hidden = !document.getElementById('panel').hidden;
+  else if (k === 's') save();
+});
+
+function recap(){
+  for (const L of lanes) L.cap = Math.max(2, Math.round(L.base * density));
+}
+
+function save(){
+  stage.toBlob(b => {
+    const u = URL.createObjectURL(b);
+    const a = document.createElement('a');
+    a.href = u; a.download = 'civitas-' + seed.toString(36) + '.png';
+    a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000);
+  }, 'image/png');
+}
+
+// a passer-by called into being where you touch
+stage.addEventListener('pointerdown', e => {
+  let best = lanes[0], bd = Infinity;
+  for (const L of lanes){ const d = Math.abs(L.y - e.clientY); if (d < bd){ bd = d; best = L; } }
+  const a = makeAgent(best, e.clientX, false);
+  a.a = 0; a.aT = 1;
+  best.agents.push(a);
+});
+
+addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(resize, 140); });
+
+DPR = Math.min(2, window.devicePixelRatio || 1);
+W = window.innerWidth; H = window.innerHeight;
+stage.style.width = W+'px'; stage.style.height = H+'px';
+fit(stage, ctx); fit(trail, tx); fit(cityC, cx);
+const fromHash = parseInt(location.hash.slice(1), 10);
+build(Number.isFinite(fromHash) ? fromHash : ((Math.random()*4294967295) >>> 0));
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
