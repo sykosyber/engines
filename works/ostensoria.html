@@ -142,6 +142,7 @@
         <button id="btnRender">Re-develop</button>
         <button id="btnExport">Export PNG</button>
       </div>
+      <label class="toggle"><input type="checkbox" id="live" checked> Live: watch it draw</label>
 
       <fieldset>
         <legend>Seed</legend>
@@ -367,7 +368,7 @@
 
   const el=id=>document.getElementById(id);
   const controls={
-    seed:el("seed"), family:el("family"), order:el("order"), mirror:el("mirror"),
+    seed:el("seed"), family:el("family"), order:el("order"), mirror:el("mirror"), live:el("live"),
     quality:el("quality"), exposure:el("exposure"), gamma:el("gamma"), bloom:el("bloom"),
     palette:el("palette"), hue:el("hue"), bands:el("bands"), sat:el("sat"),
     chroma:el("chroma"), grain:el("grain"), imprint:el("imprint")
@@ -392,8 +393,11 @@
   }
 
   // ---------- accumulate density field ----------
-  function beginPlate(){
-    if(running) return;
+  function beginPlate(animate){
+    // a live draw can be interrupted by a new plate; anything else waits for it
+    if(running && !liveRun) return;
+    const myRun=++runId;
+    liveRun = controls.live.checked && animate===true;
     const f=readForm();
     const seedRng=mulberry32(xmur3(f.seed)());
     // choose family from seed if auto
@@ -440,12 +444,16 @@
     running=true;
     setBusy(true);
     prog.classList.add("on"); progBar.style.width="0%";
+    if(liveRun){ el("btnNew").disabled=false; pvImg=ctx.createImageData(res,res); }
 
-    let done=0;
+    let done=0, liveT0=0;
     // local refs for speed
     const F=field, W=res;
-    function chunk(){
-      const stop=Math.min(done+CHUNK, iters);
+    function chunk(now){
+      if(myRun!==runId) return;
+      let n=CHUNK;
+      if(liveRun){ if(!liveT0) liveT0=now; const tau=Math.min(1,(now-liveT0)/(LIVE_SECONDS*1000)); n=Math.max(1, Math.round(iters*tau*tau*tau)-done); }
+      const stop=Math.min(done+n, iters);
       for(let i=done;i<stop;i++){
         attr.step(x,y,o); x=o[0]; y=o[1];
         const px=(x-cx0)*scale, py=(y-cy0)*scale;
@@ -462,6 +470,7 @@
       }
       done=stop;
       progBar.style.width=(100*done/iters).toFixed(1)+"%";
+      if(liveRun) previewPaint(done/iters);
       if(done<iters){ requestAnimationFrame(chunk); }
       else{ finishAccum(); }
     }
@@ -476,7 +485,7 @@
     let m=1;
     for(let i=0;i<fieldDev.length;i++){ if(fieldDev[i]>m)m=fieldDev[i]; }
     fMax=m;
-    running=false;
+    running=false; liveRun=false;
     // allocate develop buffers
     baseR=new Float32Array(fW*fH); baseG=new Float32Array(fW*fH); baseB=new Float32Array(fW*fH);
     glowW=fW>>2; glowH=fH>>2; glowSmall=new Float32Array(glowW*glowH);
@@ -484,6 +493,48 @@
     prog.classList.remove("on");
     setBusy(false);
     updateLabel();
+  }
+
+  // ---------- live: the plate is drawn as the orbit accumulates ----------
+  // A light develop of the counts so far, repainted every frame and paced so
+  // a new plate takes LIVE_SECONDS to draw. It tones against the density the
+  // finished plate will reach, so the form rises out of the dark instead of
+  // looking complete at once; the full develop (bloom, fringe, grain) lands
+  // when it finishes. Off with ?live=0, and by default
+  // for anyone who asks the system for reduced motion.
+  // Paced on an ease-in curve: a few thousand points first, so the form
+  // gathers like dust, then faster until the full density lands.
+  const LIVE_SECONDS=8;
+  const liveQ=new URLSearchParams(location.search).get("live");
+  controls.live.checked = liveQ==="1" || (liveQ!=="0" && !matchMedia("(prefers-reduced-motion: reduce)").matches);
+  let liveRun=false, runId=0, pvImg=null, pvBuf=null;
+
+  function previewPaint(frac){
+    const look=readLook(), W=fW, N=W*fH;
+    // the same light blur the final develop starts from
+    if(!pvBuf || pvBuf.length!==N) pvBuf=new Float32Array(N);
+    const F=pvBuf; F.set(field); boxBlur(F,W,fH,1);
+    let m=1e-6; for(let i=0;i<N;i++) if(F[i]>m) m=F[i];
+    const mEnd=Math.max(1, m/Math.max(frac,1e-3));      // density grows with the iterations
+    const top=Math.min(Math.round(m*9), 1<<22), logMax=Math.log(1+mEnd*look.exposure), gm=look.gamma;
+    let rampName=controls.palette.value; if(!RAMPS[rampName]) rampName="iris";
+    const LUT=buildLUT(RAMPS[rampName], clamp(look.sat,0,1));
+    const bands=look.bands, phaseHue=look.hue+cur.phase*0.27;
+    // a 3x3 average of whole counts is a multiple of 1/9, so each level is toned once
+    const tone=new Float32Array(top+1);
+    for(let q=1; q<=top; q++) tone[q]=Math.pow(clamp(Math.log(1+(q/9)*look.exposure)/logMax,0,1),gm);
+    const data=pvImg.data, P0=paper[0]*255, P1=paper[1]*255, P2=paper[2]*255;
+    for(let i=0;i<N;i++){
+      const o=i*4, d=Math.round(F[i]*9);
+      if(d<=0){ data[o]=P0; data[o+1]=P1; data[o+2]=P2; data[o+3]=255; continue; }
+      const t=tone[d>top?top:d];
+      const u=fract(t*bands+phaseHue), o3=((u*255)|0)*3;
+      const env=smooth(0.0,0.11,t), hot=smooth(0.80,1.0,t), cov=smooth(0.0,0.02,t), ir=1-cov;
+      let r=LUT[o3]*env, g=LUT[o3+1]*env, b=LUT[o3+2]*env;
+      r=r+(1-r)*hot; g=g+(1-g)*hot; b=b+(1-b)*hot;
+      data[o]=(paper[0]*ir+r*cov)*255; data[o+1]=(paper[1]*ir+g*cov)*255; data[o+2]=(paper[2]*ir+b*cov)*255; data[o+3]=255;
+    }
+    ctx.putImageData(pvImg,0,0);
   }
 
   // ---------- develop: field -> pixels ----------
@@ -678,7 +729,7 @@
     controls.order.value=orders[(sr()*orders.length)|0];
     controls.mirror.checked = sr()>0.12;
     syncLabels();
-    beginPlate();
+    beginPlate(true);
   }
 
   function syncLabels(){
@@ -708,7 +759,7 @@
   el("btnNew").addEventListener("click",newPlate);
   el("btnRender").addEventListener("click",()=>{ if(!running) develop(); });
   el("btnCopy").addEventListener("click",()=>{ navigator.clipboard&&navigator.clipboard.writeText(controls.seed.value); });
-  controls.seed.addEventListener("change",beginPlate);
+  controls.seed.addEventListener("change",()=>beginPlate(true));
 
   el("btnExport").addEventListener("click",()=>{
     let out=cv;
@@ -730,9 +781,9 @@
   // ---------- boot ----------
   controls.seed.value=randomSeed();
   syncLabels();
-  window.addEventListener("load",()=>{ beginPlate(); });
+  window.addEventListener("load",()=>{ beginPlate(true); });
   // in case load already fired
-  if(document.readyState==="complete") beginPlate();
+  if(document.readyState==="complete") beginPlate(true);
 })();
 </script>
 <!-- Back to the Engines index, set as a breadcrumb above the brand line. Removed when the index runs this work in its own viewer. -->
