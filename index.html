@@ -125,15 +125,25 @@ a{color:inherit}
 .rv.in{opacity:1}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}}
 
-/* live */
-.live{position:fixed;inset:0;z-index:20;background:#000;display:none}
-.live.on{display:block}
-.live iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
-.live .bar{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);display:flex;gap:6px;align-items:center}
-.live .bar span{font:11px var(--mono);color:rgba(236,229,214,.6);background:rgba(0,0,0,.55);padding:10px 12px}
-.live .bar button{font:11px var(--mono);color:var(--bone);background:rgba(0,0,0,.65);border:1px solid rgba(236,229,214,.25);padding:10px 14px;cursor:pointer}
-.live .bar button:hover,.live .bar a:hover{border-color:var(--gold)}
-.live .bar a{font:11px var(--mono);color:var(--bone);background:rgba(0,0,0,.65);border:1px solid rgba(236,229,214,.25);padding:10px 14px;text-decoration:none}
+/* live: the running work gets the whole screen except one band, set like the
+   hero's top line, so the way back never sits on top of the art */
+.live{position:fixed;inset:0;z-index:20;background:var(--ground);display:none;flex-direction:column}
+.live.on{display:flex}
+.live iframe{flex:1;min-height:0;width:100%;border:0;background:#000}
+.live .bar{flex:none;display:flex;align-items:center;gap:clamp(16px,2.6vw,36px);min-height:48px;padding:env(safe-area-inset-top,0px) calc(var(--gut) + env(safe-area-inset-right,0px)) 0 calc(var(--gut) + env(safe-area-inset-left,0px));border-bottom:1px solid var(--rule);font:11px/1 var(--mono);color:var(--faint)}
+.live .now{flex:1;min-width:0;margin:0;display:flex;align-items:baseline;gap:14px;white-space:nowrap;overflow:hidden}
+.live .now .n{font:11px var(--mono);color:var(--faint)}
+.live .now .t{font:italic 300 22px/1 var(--serif);color:var(--bone)}
+.live .now .l{font:italic 17px/1 var(--serif);color:var(--faint);overflow:hidden;text-overflow:ellipsis}
+.live .bar button,.live .bar a{flex:none;font:11px/1 var(--mono);color:var(--dim);background:none;border:0;padding:14px 0;cursor:pointer;text-decoration:none;white-space:nowrap;transition:color .3s ease}
+.live .bar button:hover,.live .bar a:hover{color:var(--bone)}
+.live .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.live .now .l,.live .tab-long{display:none}
+@media (min-width:700px){.live .tab-long{display:inline}.live .tab-short{display:none}}
+/* option B, for review: the same band set as a caption beneath the plate */
+.live[data-variant="caption"]{flex-direction:column-reverse}
+.live[data-variant="caption"] .bar{border-bottom:0;border-top:1px solid var(--rule);padding-top:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (min-width:900px){.live[data-variant="caption"] .now .l{display:inline}}
 </style>
 </head>
 <body>
@@ -235,11 +245,15 @@ a{color:inherit}
 </section></main>
 <footer class="colophon">
   <p>Made by Mateo at SyberLabs, in collaboration with Claude. Every visual channel in these pieces is computed from the system itself, verified numerically before it is drawn, and seeded so any plate can be made again.</p>
-  <div class="meta">7 engines, each one self-contained HTML<br>Canvas 2D and WebGL2, no libraries<br>Cormorant Garamond and Space Mono<br><a href="https://syberlabs.space" target="_blank" rel="noopener">syberlabs.space</a></div>
+  <div class="meta">7 engines, each one self-contained HTML<br>Canvas 2D and WebGL2, no libraries<br>Cormorant Garamond and Space Mono<br><a href="https://syberlabs.io" target="_blank" rel="noopener">syberlabs.io</a></div>
 </footer>
 
-<div class="live" id="live" role="dialog" aria-modal="true" aria-label="Live engine">
-  <div class="bar"><span id="liveName"></span><a id="liveTab" href="#" target="_blank" rel="noopener">open in its own tab</a><button type="button" id="liveClose">close</button></div>
+<div class="live" id="live" role="dialog" aria-modal="true" aria-labelledby="liveName">
+  <div class="bar">
+    <button type="button" id="liveClose"><span aria-hidden="true">&larr;</span> <span class="sr">Back to </span>Engines</button>
+    <p class="now"><span class="n" id="liveNum"></span><span class="t" id="liveName"></span><span class="l" id="liveLine"></span></p>
+    <a id="liveTab" href="#" target="_blank" rel="noopener"><span class="tab-long">open in its own tab</span><span class="tab-short">own tab</span> <span aria-hidden="true">&#8599;</span></a>
+  </div>
   <iframe id="liveFrame" title="Live engine" allow="fullscreen"></iframe>
 </div>
 
@@ -283,9 +297,13 @@ a{color:inherit}
   const nameEl = document.getElementById("liveName"), closeBtn = document.getElementById("liveClose");
   let opener = null;
   const tab = document.getElementById("liveTab");
+  const numEl = document.getElementById("liveNum"), lineEl = document.getElementById("liveLine");
   function open(btn) {
     opener = btn;
+    const work = btn.closest(".work");
     nameEl.textContent = btn.dataset.name;
+    numEl.textContent = work.querySelector(".title .n").textContent;
+    lineEl.textContent = work.querySelector(".line").textContent;
     const url = "works/" + btn.dataset.engine + ".html";
     tab.href = url;
     frame.src = url;
