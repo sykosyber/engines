@@ -23,3 +23,7 @@ Open `index.html` through any static server, for example `python3 -m http.server
 ## Publishing
 
 The site is static. With GitHub Pages enabled on the `main` branch (root folder), it is served at `https://sykosyber.github.io/engines/`.
+
+## License
+
+Released under the [MIT License](LICENSE).
