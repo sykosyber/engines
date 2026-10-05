@@ -134,16 +134,11 @@ a{color:inherit}
 .live .now{flex:1;min-width:0;margin:0;display:flex;align-items:baseline;gap:14px;white-space:nowrap;overflow:hidden}
 .live .now .n{font:11px var(--mono);color:var(--faint)}
 .live .now .t{font:italic 300 22px/1 var(--serif);color:var(--bone)}
-.live .now .l{font:italic 17px/1 var(--serif);color:var(--faint);overflow:hidden;text-overflow:ellipsis}
 .live .bar button,.live .bar a{flex:none;font:11px/1 var(--mono);color:var(--dim);background:none;border:0;padding:14px 0;cursor:pointer;text-decoration:none;white-space:nowrap;transition:color .3s ease}
 .live .bar button:hover,.live .bar a:hover{color:var(--bone)}
 .live .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.live .now .l,.live .tab-long{display:none}
+.live .tab-long{display:none}
 @media (min-width:700px){.live .tab-long{display:inline}.live .tab-short{display:none}}
-/* option B, for review: the same band set as a caption beneath the plate */
-.live[data-variant="caption"]{flex-direction:column-reverse}
-.live[data-variant="caption"] .bar{border-bottom:0;border-top:1px solid var(--rule);padding-top:0;padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (min-width:900px){.live[data-variant="caption"] .now .l{display:inline}}
 </style>
 </head>
 <body>
@@ -251,7 +246,7 @@ a{color:inherit}
 <div class="live" id="live" role="dialog" aria-modal="true" aria-labelledby="liveName">
   <div class="bar">
     <button type="button" id="liveClose"><span aria-hidden="true">&larr;</span> <span class="sr">Back to </span>Engines</button>
-    <p class="now"><span class="n" id="liveNum"></span><span class="t" id="liveName"></span><span class="l" id="liveLine"></span></p>
+    <p class="now"><span class="n" id="liveNum"></span><span class="t" id="liveName"></span></p>
     <a id="liveTab" href="#" target="_blank" rel="noopener"><span class="tab-long">open in its own tab</span><span class="tab-short">own tab</span> <span aria-hidden="true">&#8599;</span></a>
   </div>
   <iframe id="liveFrame" title="Live engine" allow="fullscreen"></iframe>
@@ -297,14 +292,12 @@ a{color:inherit}
   const nameEl = document.getElementById("liveName"), closeBtn = document.getElementById("liveClose");
   let opener = null;
   const tab = document.getElementById("liveTab");
-  const numEl = document.getElementById("liveNum"), lineEl = document.getElementById("liveLine");
+  const numEl = document.getElementById("liveNum");
   function open(btn) {
     opener = btn;
     const work = btn.closest(".work");
     nameEl.textContent = btn.dataset.name;
-    numEl.textContent = work.querySelector(".title .n").textContent;
-    lineEl.textContent = work.querySelector(".line").textContent;
-    const url = "works/" + btn.dataset.engine + ".html";
+    numEl.textContent = work.querySelector(".title .n").textContent;    const url = "works/" + btn.dataset.engine + ".html";
     tab.href = url;
     frame.src = url;
     live.classList.add("on");
