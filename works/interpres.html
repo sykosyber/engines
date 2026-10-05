@@ -80,6 +80,8 @@
 </div></div>
 <div class="whisper" id="whisper"></div>
 
+<a class="engines-back" href="../#interpres"><span aria-hidden="true">&larr;</span> engines</a>
+
 <form class="speak" id="speak" autocomplete="off">
   <label for="msg">Write to the portrait</label>
   <input id="msg" type="text" placeholder="Write to me" maxlength="400" enterkeyhint="send">
@@ -378,14 +380,12 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<!-- Back to the Engines index. Hidden when the index runs this work in its own viewer. -->
-<a class="engines-back" href="../index.html#interpres">&larr; Engines</a>
+<!-- Back to the Engines index, set like "let the page forget" in the opposite corner. Removed when the index runs this work in its own viewer. -->
 <style>
-  .engines-back{position:fixed;z-index:50;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));
-    padding:8px 11px;font:400 10.5px/1 "Space Mono",ui-monospace,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;
-    color:rgba(236,232,240,.8);text-decoration:none;background:rgba(8,7,10,.55);border:1px solid rgba(236,232,240,.2);
-    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:color .2s,border-color .2s}
-  .engines-back:hover,.engines-back:focus-visible{color:#fff;border-color:rgba(236,232,240,.5);outline:none}
+  .engines-back{position:fixed;z-index:5;left:calc(12px + env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));padding:10px 8px;
+    font:11px/1 "Space Mono",ui-monospace,Menlo,monospace;color:var(--dim);text-decoration:none;border-radius:2px;transition:color .2s}
+  .engines-back:hover{color:var(--bone)}
+  .engines-back:focus-visible{color:var(--bone);outline:1px solid var(--clay);outline-offset:2px}
   @media print{.engines-back{display:none}}
 </style>
 <script>if (window.self !== window.top) document.querySelector(".engines-back").remove();</script>
