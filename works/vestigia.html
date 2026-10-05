@@ -124,6 +124,12 @@
 <body>
 <canvas id="c"></canvas>
 
+<div id="colophon">
+  <a class="engines-back" href="../#vestigia"><span aria-hidden="true">&larr;</span> Engines</a>
+  <h1>Vestigia</h1>
+  <p>Every direction the growth considered stays on the plate. The bright filament is the part that survived.</p>
+</div>
+
 <div id="panel">
   <div class="sect">Plate</div>
   <div class="row">
@@ -136,11 +142,6 @@
     <div id="status">idle</div>
   </div>
   <div id="controls"></div>
-</div>
-
-<div id="colophon">
-  <h1>Vestigia</h1>
-  <p>Every direction the growth considered stays on the plate. The bright filament is the part that survived.</p>
 </div>
 
 <div id="keys" class="mono">
@@ -855,14 +856,12 @@ requestAnimationFrame(tick);
 
 })();
 </script>
-<!-- Back to the Engines index. Hidden when the index runs this work in its own viewer. -->
-<a class="engines-back" href="../index.html#vestigia">&larr; Engines</a>
+<!-- Back to the Engines index, set in the colophon above the title. Removed when the index runs this work in its own viewer. -->
 <style>
-  .engines-back{position:fixed;z-index:50;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));
-    padding:8px 11px;font:400 10.5px/1 "Space Mono",ui-monospace,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;
-    color:rgba(236,232,240,.8);text-decoration:none;background:rgba(8,7,10,.55);border:1px solid rgba(236,232,240,.2);
-    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:color .2s,border-color .2s}
-  .engines-back:hover,.engines-back:focus-visible{color:#fff;border-color:rgba(236,232,240,.5);outline:none}
+  .engines-back{display:inline-block;pointer-events:auto;margin:0 0 6px;padding:8px 0;font:400 9.5px/1 "Space Mono",ui-monospace,monospace;
+    letter-spacing:.24em;text-transform:uppercase;color:var(--ink);text-decoration:none;transition:color .2s}
+  .engines-back:hover,.engines-back:focus-visible{color:rgba(255,255,255,.92)}
+  .engines-back:focus-visible{outline:1px solid rgba(255,255,255,.5);outline-offset:4px}
   @media print{.engines-back{display:none}}
 </style>
 <script>if (window.self !== window.top) document.querySelector(".engines-back").remove();</script>

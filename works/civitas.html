@@ -75,6 +75,8 @@
 <div class="grain"></div>
 <div class="title" id="card">Civitas<small>souls in passage</small></div>
 
+<a class="engines-back" href="../#civitas"><span aria-hidden="true">&larr;</span> engines</a>
+
 <div class="panel" id="panel">
   <h1>Civitas</h1>
   <div class="meta"><span id="m-seed">seed</span> &nbsp;/&nbsp; <span id="m-pal">palette</span> &nbsp;/&nbsp; <span id="m-pop">0 souls</span></div>
@@ -811,14 +813,13 @@ build(Number.isFinite(fromHash) ? fromHash : ((Math.random()*4294967295) >>> 0))
 requestAnimationFrame(frame);
 })();
 </script>
-<!-- Back to the Engines index. Hidden when the index runs this work in its own viewer. -->
-<a class="engines-back" href="../index.html#civitas">&larr; Engines</a>
+<!-- Back to the Engines index, in the panel's own type, top left where the sky is empty. Removed when the index runs this work in its own viewer. -->
 <style>
-  .engines-back{position:fixed;z-index:50;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));
-    padding:8px 11px;font:400 10.5px/1 "Space Mono",ui-monospace,Menlo,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase;
-    color:rgba(236,232,240,.8);text-decoration:none;background:rgba(8,7,10,.55);border:1px solid rgba(236,232,240,.2);
-    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:color .2s,border-color .2s}
-  .engines-back:hover,.engines-back:focus-visible{color:#fff;border-color:rgba(236,232,240,.5);outline:none}
+  .engines-back{position:fixed;z-index:6;left:calc(18px + env(safe-area-inset-left,0px));top:calc(12px + env(safe-area-inset-top,0px));padding:8px 0;
+    font:400 10.5px/1 'Space Mono',ui-monospace,monospace;letter-spacing:.12em;color:var(--ash);text-decoration:none;transition:color .2s}
+  .engines-back:hover,.engines-back:focus-visible{color:rgba(236,232,224,.95)}
+  .engines-back:focus-visible{outline:1px solid var(--ash);outline-offset:4px}
+  @media (max-width:560px){.engines-back{left:calc(10px + env(safe-area-inset-left,0px))}}
   @media print{.engines-back{display:none}}
 </style>
 <script>if (window.self !== window.top) document.querySelector(".engines-back").remove();</script>
