@@ -116,6 +116,7 @@
         <button id="btnRender">Re-develop</button>
         <button id="btnExport">Export PNG</button>
       </div>
+      <label class="toggle"><input type="checkbox" id="live" checked> Live: trace, then drift</label>
 
       <fieldset>
         <legend>Seed</legend>
@@ -310,7 +311,7 @@
   const prog=el("prog");
   const controls={};
   ["seed","family","trace","scale","weight","quality","yaw","pitch","roll","depth","persp",
-   "exposure","gamma","bloom","haze","palette","cmode","hue","sat","chroma","grain","imprint"].forEach(id=>controls[id]=el(id));
+   "exposure","gamma","bloom","haze","palette","cmode","hue","sat","chroma","grain","imprint","live"].forEach(id=>controls[id]=el(id));
 
   function syncLabels(){
     el("vTrace").textContent=(+controls.trace.value).toFixed(2);
@@ -361,9 +362,15 @@
       for(let xx=x0;xx<=x1;xx++){const dx=xx-x,w=Math.exp(-(dx*dx+dy*dy)*inv);if(w<0.004)continue;const i=row+xx;hzR[i]+=r*w;hzG[i]+=g*w;hzB[i]+=b*w;}}
   }
 
-  function beginPlate(){
-    if(running) return;
+  function beginPlate(animate){
+    // a live trace can be interrupted by a new orbit; anything else waits for it
+    if(running && !liveRun) return;
+    stopDrift(false, null, true);   // a new plate replaces it, so nothing to finish
+    runId++;
+    liveRun = controls.live.checked && animate===true;
+    if(liveRun) driftHeld=false;
     running=true; setBusy(true);
+    if(liveRun) el("btnNew").disabled=false;
     prog.classList.add("on"); prog.querySelector("i").style.width="0%";
 
     const seed=controls.seed.value.trim()||"GYRE";
@@ -400,16 +407,31 @@
 
     cur.pts=pts; cur.nPts=nPts; cur.cx=cx; cur.cy=cy; cur.cz=cz; cur.sc=sc;
 
+    // live: the full plate is accumulated quietly (it is the reference the
+    // turning frames are matched to), then the thread grows on screen
+    if(liveRun){
+      for(const a of [accR,accG,accB,hzR,hzG,hzB]) a.fill(0);
+      drawFilament(null,{sync:true});
+      if(+controls.haze.value>0){ boxBlur3(hzR,fW,fH,2);boxBlur3(hzG,fW,fH,2);boxBlur3(hzB,fW,fH,2); }
+      startDrift(true);
+      return;
+    }
     // draw (chunked)
     drawFilament(()=>{ finishAccum(); });
   }
 
   function orientation(){
-    const rx=cur.rx + (+controls.pitch.value), ry=cur.ry + (+controls.yaw.value), rz=cur.rz + (+controls.roll.value);
+    const v=viewAngles();
+    const rx=cur.rx + v[1], ry=cur.ry + v[0], rz=cur.rz + v[2];
     return {cxr:Math.cos(rx),sxr:Math.sin(rx),cyr:Math.cos(ry),syr:Math.sin(ry),czr:Math.cos(rz),szr:Math.sin(rz)};
   }
 
-  function drawFilament(done){
+  // opts.sync draws every point now (drift frames, full redraws); otherwise in
+  // slices per frame, and a live trace takes only enough points per frame to
+  // last TRACE_SECONDS. stride and radScale serve the half-resolution drift.
+  function drawFilament(done, opts){
+    opts=opts||{};
+    const stride=opts.stride||1, radScale=opts.radScale||1, noHaze=!!opts.noHaze, myRun=runId;
     const {pts,nPts,cx,cy,cz,sc}=cur;
     const res=fW;
     const O=orientation();
@@ -435,11 +457,15 @@
       o[0]=x3;o[1]=y3;o[2]=z2;
     }
 
-    function tick(){
+    let lastT=0;
+    function tick(now){
+      if(!opts.sync && myRun!==runId) return;
       const t0=performance.now();
-      while(i<nPts && performance.now()-t0<26){
-        const end=Math.min(nPts, i+4000);
-        for(; i<end; i++){
+      let limit=opts.limit!=null ? opts.limit : nPts;
+      if(liveRun && !opts.sync){ const dt=lastT?Math.min(100,now-lastT):16.7; lastT=now; limit=Math.min(nPts, i+Math.max(1,Math.round(nPts*dt/(TRACE_SECONDS*1000)))); }
+      while(i<limit && (opts.sync || performance.now()-t0<26)){
+        const end=Math.min(limit, i+4000);
+        for(; i<end; i+=stride){
           const x=(pts[i*3]-cx)*sc, y=(pts[i*3+1]-cy)*sc, z=(pts[i*3+2]-cz)*sc;
           rot(x,y,z);
           const zc=lerp(1.0, o[2]+camD, perspAmt);       // perspective blend
@@ -452,7 +478,7 @@
           else u=depth;
           lutRGB(LUT,u,col);
           const bright=lerp(1.0, lerp(0.22,1.15,depth), depthCue);
-          const rad=lerp(0.6,1.5,depth)*weight;
+          const rad=lerp(0.6,1.5,depth)*weight*radScale;
           if(has){
             const dx=sx-prevSX,dy=sy-prevSY,dist=Math.hypot(dx,dy);
             if(dist<res*0.25){
@@ -462,7 +488,7 @@
             }
           }
           // haze: occasional soft wide splat (volumetric glow around the body)
-          if(hazeAmt>0 && (i&7)===0){
+          if(hazeAmt>0 && !noHaze && (i&7)===0){
             const hb=bright*hazeAmt*0.08;
             splatHaze(sx,sy,res*0.02*(0.6+0.8*depth), col[0]*hb,col[1]*hb,col[2]*hb);
           }
@@ -470,18 +496,25 @@
         }
         prog.querySelector("i").style.width=Math.round(i/nPts*100)+"%";
       }
+      if(opts.sync) return;
+      if(liveRun) previewPaint();
       if(i<nPts) requestAnimationFrame(tick);
       else done();
     }
+    if(opts.sync){ tick(0); return; }
     requestAnimationFrame(tick);
   }
 
   function finishAccum(){
     running=false;
+    // haze is softened once per plate here, not in develop(), so re-developing never blurs it twice
+    if(+controls.haze.value>0){ boxBlur3(hzR,fW,fH,2);boxBlur3(hzG,fW,fH,2);boxBlur3(hzB,fW,fH,2); }
     develop();
     prog.classList.remove("on");
     setBusy(false);
     updateLabel();
+    const wasLive=liveRun, id=runId; liveRun=false;
+    setTimeout(()=>{ if(id===runId) startDrift(); }, wasLive?1400:600);
   }
 
   function boxBlur3(buf,W,H,r){
@@ -492,13 +525,14 @@
       for(let y=0;y<H;y++){buf[y*W+x]=acc*norm;acc+=tmp[clamp(y+r+1,0,H-1)*W+x]-tmp[clamp(y-r,0,H-1)*W+x];}}
   }
 
-  function develop(){
-    if(!accR) return;
+  // opts.target paints elsewhere (the half-resolution drift); opts.gain scales the light to match.
+  // While the view drifts, the drift paints every frame, so other calls wait.
+  function develop(opts){
+    opts=opts||{};
+    if(!accR || (drift && !opts.target)) return;
     const look=readLook();
     const W=fW,H=fH,N=W*H;
-    const exp=look.exposure, gm=look.gamma, haze=look.haze;
-    // soften the haze buffer
-    if(haze>0){ boxBlur3(hzR,W,H,2);boxBlur3(hzG,W,H,2);boxBlur3(hzB,W,H,2); }
+    const exp=look.exposure*(opts.gain||1), gm=look.gamma;
     const baseR=new Float32Array(N),baseG=new Float32Array(N),baseB=new Float32Array(N);
     glowSmall.fill(0);
     for(let i=0;i<N;i++){
@@ -533,7 +567,147 @@
         if(grain>0){const n=gtab[(gi++)&(GT-1)]*grain;R+=n;G+=n;B+=n;}
         const o2=i*4;data[o2]=clamp(R,0,1)*255;data[o2+1]=clamp(G,0,1)*255;data[o2+2]=clamp(B,0,1)*255;data[o2+3]=255;
       }}
-    ctx.putImageData(img,0,0);
+    (opts.target||ctx).putImageData(img,0,0);
+  }
+
+  // ---- live: the thread grows while the view turns ----
+  // On a new orbit the single thread is laid down over TRACE_SECONDS while
+  // yaw, pitch and roll glide together at incommensurate rates, so the body
+  // turns through every side without repeating; the turning continues after. Drift frames render at half
+  // resolution through the same develop, matched in brightness to the plate;
+  // the full plate returns whenever the drift stops (taking a View slider,
+  // export, a new orbit, or switching Live off). Off with ?live=0, and by
+  // default for anyone who asks the system for reduced motion.
+  const TRACE_SECONDS=6;
+  const DRIFT=[0.15,0.093,0.057];          // rad/s: yaw, pitch, roll (golden ratios apart)
+  const liveQ=new URLSearchParams(location.search).get("live");
+  controls.live.checked = liveQ==="1" || (liveQ!=="0" && !matchMedia("(prefers-reduced-motion: reduce)").matches);
+  let liveRun=false, runId=0, drift=null, driftHeld=false, pvImg=null;
+
+  function viewAngles(){ return drift ? drift.ang : [+controls.yaw.value, +controls.pitch.value, +controls.roll.value]; }
+
+  // a light develop of the buffers so far, repainted every frame of a live trace
+  function previewPaint(){
+    const look=readLook(), W=fW, N=W*fH, exp=look.exposure;
+    if(!pvImg || pvImg.width!==W) pvImg=ctx.createImageData(W,fH);
+    const T=2048, tab=new Uint8ClampedArray(T+1);
+    for(let k=0;k<=T;k++) tab[k]=Math.pow(k/T,look.gamma)*255;
+    const d=pvImg.data;
+    for(let i=0;i<N;i++){
+      const r=(accR[i]+hzR[i])*exp, g=(accG[i]+hzG[i])*exp, b=(accB[i]+hzB[i])*exp, o=i*4;
+      d[o]=tab[(r/(1+r)*T)|0]; d[o+1]=tab[(g/(1+g)*T)|0]; d[o+2]=tab[(b/(1+b)*T)|0]; d[o+3]=255;
+    }
+    ctx.putImageData(pvImg,0,0);
+  }
+
+  function buffers(){ return {W:fW,H:fH,accR,accG,accB,hzR,hzG,hzB,glowSmall,glowW,glowH}; }
+  function bind(s){ fW=s.W;fH=s.H;accR=s.accR;accG=s.accG;accB=s.accB;hzR=s.hzR;hzG=s.hzG;hzB=s.hzB;glowSmall=s.glowSmall;glowW=s.glowW;glowH=s.glowH; }
+  function makeBuffers(res){ const N=res*res, g=res>>2;
+    return {W:res,H:res,accR:new Float32Array(N),accG:new Float32Array(N),accB:new Float32Array(N),
+      hzR:new Float32Array(N),hzG:new Float32Array(N),hzB:new Float32Array(N),glowSmall:new Float32Array(g*g),glowW:g,glowH:g}; }
+  function sumOf(...arrs){ let t=0; for(const a of arrs) for(let i=0;i<a.length;i++) t+=a[i]; return t; }
+  function meanLight(s){ let t=0; const N=s.W*s.H; for(let i=0;i<N;i++) t+=s.accR[i]+s.accG[i]+s.accB[i]+s.hzR[i]+s.hzG[i]+s.hzB[i]; return t/N; }
+
+  function startDrift(grow){
+    if(drift || (running && !grow) || !cur.pts || !controls.live.checked || driftHeld) return;
+    const half=makeBuffers(fW>>1), off=document.createElement("canvas");
+    off.width=off.height=half.W;
+    drift={ ang:[+controls.yaw.value,+controls.pitch.value,+controls.roll.value], full:buffers(), half, off,
+            octx:off.getContext("2d"), img:null, last:0, ease:0, gain:1, raf:0, grow:!!grow, t0:0,
+            // haze share of the light in the finished plate, so the stand-in haze matches it
+            hzShare: sumOf(hzR,hzG,hzB)/Math.max(1e-9,sumOf(accR,accG,accB)) };
+    drift.img=drift.octx.createImageData(half.W,half.H);
+    halfFrame(drift, cur.nPts);                 // whole thread once, to match the light
+    drift.gain=meanLight(drift.full)/Math.max(1e-9,meanLight(half));
+    drift.raf=requestAnimationFrame(driftFrame);
+  }
+  // the thread up to point `limit`, at half resolution, at the current angles.
+  // Per-point haze splats cost ten times the filament, so in motion the haze is
+  // the filament itself, blurred wide and scaled to the plate's haze share.
+  function halfFrame(d, limit){
+    const h=d.half;
+    for(const a of [h.accR,h.accG,h.accB,h.hzR,h.hzG,h.hzB]) a.fill(0);
+    bind(h);
+    drawFilament(null,{sync:true,stride:2,radScale:0.5,noHaze:true,limit});
+    bind(d.full);
+    if(+controls.haze.value>0){
+      const src=[h.accR,h.accG,h.accB], dst=[h.hzR,h.hzG,h.hzB];
+      for(let k=0;k<3;k++){ const a=dst[k]; a.set(src[k]); boxBlur3(a,h.W,h.H,4); boxBlur3(a,h.W,h.H,4); for(let i=0;i<a.length;i++) a[i]*=d.hzShare; }
+    }
+  }
+  function driftFrame(now){
+    const d=drift; if(!d) return;
+    const dt=d.last ? Math.min(0.1,(now-d.last)/1000) : 0; d.last=now;
+    if(!d.t0) d.t0=now;
+    d.ease=Math.min(1, d.ease+dt/2.5);          // glide in over 2.5 s
+    const ids=["yaw","pitch","roll"];
+    for(let k=0;k<3;k++){ d.ang[k]=(d.ang[k]+DRIFT[k]*d.ease*dt)%TAU; controls[ids[k]].value=d.ang[k].toFixed(2); }
+    syncLabels();
+    const n=cur.nPts;
+    const limit=d.grow ? Math.min(n, Math.round(n*(now-d.t0)/(TRACE_SECONDS*1000))) : n;
+    halfFrame(d, limit);
+    driftDevelop(d.half, d.gain, d.octx, d.img);
+    ctx.imageSmoothingQuality="high";
+    ctx.drawImage(d.off,0,0,cv.width,cv.height);
+    if(d.grow){ prog.querySelector("i").style.width=Math.round(limit/n*100)+"%"; if(limit>=n) endGrowth(d); }
+    d.raf=requestAnimationFrame(driftFrame);
+  }
+  // the thread is whole: the plate is done, and the view keeps turning
+  function endGrowth(d){
+    d.grow=false; running=false; liveRun=false;
+    prog.classList.remove("on");
+    setBusy(false);
+    updateLabel();
+  }
+
+  // develop, lightened for motion: the same tone curve, bloom and vignette,
+  // without the fringe and grain that only read on a still plate
+  function driftDevelop(s, gain, octx, img){
+    const look=readLook(), W=s.W, H=s.H, N=W*H, exp=look.exposure*gain;
+    const T=2048, tab=new Float32Array(T+1); for(let k=0;k<=T;k++) tab[k]=Math.pow(k/T,look.gamma);
+    const gW=s.glowW, gH=s.glowH, glow=s.glowSmall; glow.fill(0);
+    if(!s.bR){ s.bR=new Float32Array(N); s.bG=new Float32Array(N); s.bB=new Float32Array(N); }
+    const bR=s.bR, bG=s.bG, bB=s.bB;
+    for(let i=0;i<N;i++){
+      let r=(s.accR[i]+s.hzR[i])*exp, g=(s.accG[i]+s.hzG[i])*exp, b=(s.accB[i]+s.hzB[i])*exp;
+      r=tab[(r/(1+r)*T)|0]; g=tab[(g/(1+g)*T)|0]; b=tab[(b/(1+b)*T)|0];
+      bR[i]=r; bG[i]=g; bB[i]=b;
+      const lum=0.299*r+0.587*g+0.114*b;
+      if(lum>0.42){ const gs=lum-0.42; glow[(((i/W)|0)>>2)*gW+((i%W)>>2)]+=gs*gs; }
+    }
+    const bloom=look.bloom;
+    if(bloom>0){ boxBlur3(glow,gW,gH,3); boxBlur3(glow,gW,gH,3);
+      let gmx=1e-6; for(let i=0;i<glow.length;i++) if(glow[i]>gmx) gmx=glow[i];
+      const gi=1/gmx; for(let i=0;i<glow.length;i++) glow[i]*=gi; }
+    const data=img.data, cxp=W/2, cyp=H/2, maxR=Math.hypot(cxp,cyp);
+    for(let y=0;y<H;y++){ const dy=y-cyp, gy=y/4; let y0=gy|0; const fy=gy-y0, y1=y0+1<gH?y0+1:y0;
+      for(let x=0;x<W;x++){ const i=y*W+x, dx=x-cxp, rr=Math.hypot(dx,dy)/maxR;
+        let R=bR[i], G=bG[i], B=bB[i];
+        if(bloom>0){ const gx=x/4, x0=gx|0, fx=gx-x0, x1=x0+1<gW?x0+1:x0;
+          const gl=((glow[y0*gW+x0]*(1-fx)+glow[y0*gW+x1]*fx)*(1-fy)+(glow[y1*gW+x0]*(1-fx)+glow[y1*gW+x1]*fx)*fy)*bloom;
+          R=1-(1-R)*(1-gl); G=1-(1-G)*(1-gl*0.96); B=1-(1-B)*(1-gl*0.88); }
+        const vig=1-0.5*rr*rr*rr, o=i*4;
+        data[o]=clamp(R*vig,0,1)*255; data[o+1]=clamp(G*vig,0,1)*255; data[o+2]=clamp(B*vig,0,1)*255; data[o+3]=255;
+      }}
+    octx.putImageData(img,0,0);
+  }
+
+  function stopDrift(render, skip, discard){
+    const d=drift; if(!d) return;
+    cancelAnimationFrame(d.raf); drift=null;
+    if(d.grow){ endGrowth(d); if(!discard) render=true; }   // stopped mid-growth: show the whole plate
+    bind(d.full);
+    const ids=["yaw","pitch","roll"];
+    for(let k=0;k<3;k++) if(ids[k]!==skip) controls[ids[k]].value=d.ang[k].toFixed(2);
+    syncLabels();
+    if(render) renderFull();
+  }
+  // the whole filament at full resolution, at once, for the current view
+  function renderFull(){
+    for(const a of [accR,accG,accB,hzR,hzG,hzB]) a.fill(0);
+    drawFilament(null,{sync:true});
+    if(+controls.haze.value>0){ boxBlur3(hzR,fW,fH,2);boxBlur3(hzG,fW,fH,2);boxBlur3(hzB,fW,fH,2); }
+    develop();
   }
 
   // ---- ui ----
@@ -563,7 +737,8 @@
     // reset view offsets so the seeded orientation shows
     controls.yaw.value=0; controls.pitch.value=0; controls.roll.value=0;
     syncLabels();
-    beginPlate();
+    driftHeld=false;
+    beginPlate(true);
   }
 
   // form/view/colour that feed accumulation -> re-accumulate
@@ -579,12 +754,16 @@
   // haze contributes to buffers -> re-accumulate
   controls.haze.addEventListener("input",()=>{ syncLabels(); });
   controls.haze.addEventListener("change",()=>{ if(!running) beginPlate(); });
-  controls.seed.addEventListener("change",()=>{ beginPlate(); });
+  controls.seed.addEventListener("change",()=>{ beginPlate(true); });
+  // taking hold of the view stops the drift until the next orbit
+  ["yaw","pitch","roll"].forEach(id=>controls[id].addEventListener("input",()=>{ driftHeld=true; stopDrift(false,id); }));
+  controls.live.addEventListener("change",()=>{ if(controls.live.checked){ driftHeld=false; startDrift(); } else stopDrift(true); });
 
   el("btnNew").addEventListener("click",newPlate);
   el("btnRender").addEventListener("click",()=>{ if(!running) develop(); });
   el("btnCopy").addEventListener("click",()=>{ navigator.clipboard&&navigator.clipboard.writeText(controls.seed.value); });
   el("btnExport").addEventListener("click",()=>{
+    const resume=!!drift; if(drift) stopDrift(true);
     if(controls.imprint.checked){
       ctx.save();ctx.font=`${Math.round(fW*0.014)}px "Space Mono", monospace`;
       ctx.fillStyle="rgba(235,220,185,0.66)";ctx.textBaseline="bottom";
@@ -593,13 +772,14 @@
     cv.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);
       a.download="gyre_"+cur.seed.replace(/[^A-Za-z0-9_-]/g,"")+".png";a.click();
       setTimeout(()=>URL.revokeObjectURL(a.href),1500);
-      if(controls.imprint.checked && !running) develop();},"image/png");
+      if(controls.imprint.checked && !running) develop();
+      if(resume) setTimeout(startDrift,1500);},"image/png");
   });
 
   controls.seed.value=randomSeed();
   syncLabels();
-  window.addEventListener("load",()=>{ beginPlate(); });
-  if(document.readyState==="complete") beginPlate();
+  window.addEventListener("load",()=>{ beginPlate(true); });
+  if(document.readyState==="complete") beginPlate(true);
 </script>
 <!-- Back to the Engines index, set as a breadcrumb above the brand line. Removed when the index runs this work in its own viewer. -->
 <style>
